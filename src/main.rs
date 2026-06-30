@@ -1,6 +1,8 @@
 use bevy::{ prelude::*, window::{ PrimaryWindow, WindowResolution } };
 use bevy_grid::{ self, Grid, GridPlugin, GridSize };
 
+mod input;
+
 fn main() {
     App::new()
         .add_plugins(
@@ -16,8 +18,12 @@ fn main() {
         )
         .add_plugins(GridPlugin)
         .add_systems(Startup, setup)
+        .add_systems(Update, input::input)
         .run();
 }
+
+#[derive(Component)]
+struct Player;
 
 fn setup(
     mut commands: Commands,
@@ -32,7 +38,9 @@ fn setup(
         grid.build(window_size);
         commands.insert_resource(grid);
     }
+    //Spawn player
     commands.spawn((
+        Player,
         Transform::default(),
         Mesh2d(meshes.add(Circle::new(10.0))),
         MeshMaterial2d(materials.add(ColorMaterial::from(Color::WHITE))),

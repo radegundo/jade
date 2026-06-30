@@ -23,7 +23,9 @@ fn main() {
 }
 
 #[derive(Component)]
-struct Player;
+struct Player {
+    dir: f32,
+}
 
 fn setup(
     mut commands: Commands,
@@ -40,7 +42,7 @@ fn setup(
     }
     //Spawn player
     commands.spawn((
-        Player,
+        Player { dir: 0.0 },
         Transform::default(),
         Mesh2d(meshes.add(Circle::new(10.0))),
         MeshMaterial2d(materials.add(ColorMaterial::from(Color::WHITE))),

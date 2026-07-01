@@ -1,7 +1,7 @@
 use bevy::{ prelude::*, window::{ PrimaryWindow, WindowResolution } };
 use bevy_grid::{ self, Grid, GridPlugin, GridSize };
 
-use crate::ray::Ray;
+use crate::ray::*;
 
 mod input;
 mod ray;

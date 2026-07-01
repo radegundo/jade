@@ -19,6 +19,7 @@ fn main() {
         .add_plugins(GridPlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, input::input)
+        .add_systems(Update, draw_ray)
         .run();
 }
 
@@ -47,4 +48,12 @@ fn setup(
         Mesh2d(meshes.add(Circle::new(10.0))),
         MeshMaterial2d(materials.add(ColorMaterial::from(Color::WHITE))),
     ));
+}
+
+fn draw_ray(mut gizmos: Gizmos, player_query: Query<(&Transform, &Player)>) {
+    if let Ok((transform, player)) = player_query.single() {
+        let start = transform.translation;
+        let end = start + Vec3::new(player.dir.cos(), player.dir.sin(), 0.0) * 100.0;
+        gizmos.line(start, end, Color::srgb(1.0, 0.0, 0.0));
+    }
 }

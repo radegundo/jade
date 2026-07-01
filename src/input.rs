@@ -4,9 +4,9 @@ use crate::Player;
 
 pub fn input(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut player_query: Query<(&mut Transform, &mut Player)>
+    mut player_query: Query<&mut Transform, With<Player>>
 ) {
-    if let Ok((mut transform, mut player)) = player_query.single_mut() {
+    if let Ok(mut transform) = player_query.single_mut() {
         let mut dir = Vec3::ZERO;
         if keyboard_input.pressed(KeyCode::KeyD) {
             dir.x += 10.0;
@@ -23,14 +23,10 @@ pub fn input(
         transform.translation += dir;
 
         if keyboard_input.pressed(KeyCode::KeyE) {
-            for ray in player.rays.iter_mut() {
-                ray.dir -= 0.1;
-            }
+            transform.rotation *= Quat::from_rotation_z(-0.1);
         }
         if keyboard_input.pressed(KeyCode::KeyQ) {
-            for ray in player.rays.iter_mut() {
-                ray.dir += 0.1;
-            }
+            transform.rotation *= Quat::from_rotation_z(0.1);
         }
     }
 }

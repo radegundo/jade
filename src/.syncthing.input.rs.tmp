@@ -21,5 +21,12 @@ pub fn input(
             dir.y -= 10.0;
         }
         transform.translation += dir;
+
+        if keyboard_input.pressed(KeyCode::KeyE) {
+            transform.rotation *= Quat::from_rotation_z(-0.1);
+        }
+        if keyboard_input.pressed(KeyCode::KeyQ) {
+            transform.rotation *= Quat::from_rotation_z(0.1);
+        }
     }
 }

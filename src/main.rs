@@ -27,8 +27,12 @@ fn main() {
 }
 
 #[derive(Component)]
-struct Player {
-    rays: Vec<Ray>,
+struct Player;
+#[derive(Component)]
+struct FieldOfView {
+    angle: f32,
+    ray_count: usize,
+    max_distance: f32,
 }
 
 fn setup(
@@ -46,7 +50,12 @@ fn setup(
     }
     //Spawn player
     commands.spawn((
-        Player { rays: vec![Ray { dir: 0.0, length: 100.0 }] },
+        Player,
+        FieldOfView {
+            angle: 60.0,
+            ray_count: 5,
+            max_distance: 100.0,
+        },
         Transform::default(),
         Mesh2d(meshes.add(Circle::new(10.0))),
         MeshMaterial2d(materials.add(ColorMaterial::from(Color::WHITE))),

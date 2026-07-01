@@ -1,0 +1,18 @@
+use bevy::prelude::*;
+use crate::Player;
+
+pub fn draw_ray(mut gizmos: Gizmos, player_query: Query<(&Transform, &Ray)>) {
+    if let Ok((transform, ray)) = player_query.single() {
+        let start = transform.translation;
+        let end =
+            start +
+            Vec3::new(transform.rotation.z.cos(), transform.rotation.z.sin(), 0.0) * ray.length;
+        gizmos.line(start, end, Color::srgb(1.0, 0.0, 0.0));
+    }
+}
+
+#[derive(Component)]
+pub struct Ray {
+    pub dir: f32,
+    pub length: f32,
+}

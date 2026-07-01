@@ -23,10 +23,14 @@ pub fn input(
         transform.translation += dir;
 
         if keyboard_input.pressed(KeyCode::KeyE) {
-            player.dir -= 0.1;
+            for ray in player.rays.iter_mut() {
+                ray.dir -= 0.1;
+            }
         }
         if keyboard_input.pressed(KeyCode::KeyQ) {
-            player.dir += 0.1;
+            for ray in player.rays.iter_mut() {
+                ray.dir += 0.1;
+            }
         }
     }
 }

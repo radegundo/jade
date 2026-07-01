@@ -1,7 +1,10 @@
 use bevy::{ prelude::*, window::{ PrimaryWindow, WindowResolution } };
 use bevy_grid::{ self, Grid, GridPlugin, GridSize };
 
+use crate::ray::Ray;
+
 mod input;
+mod ray;
 
 fn main() {
     App::new()
@@ -19,13 +22,13 @@ fn main() {
         .add_plugins(GridPlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, input::input)
-        .add_systems(Update, draw_ray)
+        .add_systems(Update, ray::draw_ray)
         .run();
 }
 
 #[derive(Component)]
 struct Player {
-    dir: f32,
+    rays: Vec<Ray>,
 }
 
 fn setup(
@@ -43,17 +46,9 @@ fn setup(
     }
     //Spawn player
     commands.spawn((
-        Player { dir: 0.0 },
+        Player { rays: vec![Ray { dir: 0.0, length: 100.0 }] },
         Transform::default(),
         Mesh2d(meshes.add(Circle::new(10.0))),
         MeshMaterial2d(materials.add(ColorMaterial::from(Color::WHITE))),
     ));
-}
-
-fn draw_ray(mut gizmos: Gizmos, player_query: Query<(&Transform, &Player)>) {
-    if let Ok((transform, player)) = player_query.single() {
-        let start = transform.translation;
-        let end = start + Vec3::new(player.dir.cos(), player.dir.sin(), 0.0) * 100.0;
-        gizmos.line(start, end, Color::srgb(1.0, 0.0, 0.0));
-    }
 }

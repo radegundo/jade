@@ -1,10 +1,10 @@
-use bevy::{ log::tracing::field::Field, prelude::* };
+use bevy::prelude::*;
 use crate::*;
 
 pub fn draw_ray(mut gizmos: Gizmos, query: Query<(&Transform, &FieldOfView), With<Player>>) {
   if let Ok((transform, field_of_view)) = query.single() {
     for i in 0..field_of_view.ray_count {
-      if let Some(angle) = get_ray_angle(i, query) {
+      if let Some(angle) = get_ray_angle(i, transform, field_of_view) {
         let start = transform.translation;
         let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * field_of_view.max_distance;
         gizmos.line(start, end, Color::srgb(1.0, 0.0, 0.0));
@@ -15,19 +15,17 @@ pub fn draw_ray(mut gizmos: Gizmos, query: Query<(&Transform, &FieldOfView), Wit
 
 pub fn get_ray_angle(
   ray_index: usize,
-  query: Query<(&Transform, &FieldOfView), With<Player>>
+  transform: &Transform,
+  field_of_view: &FieldOfView
 ) -> Option<f32> {
-  if let Ok((transform, field_of_view)) = query.single() {
-    let player_angle = transform.rotation.to_euler(EulerRot::XYZ).2;
-    let fov_rad = field_of_view.angle.to_radians();
-    let half_fov = fov_rad / 2.0;
+  let player_angle = transform.rotation.to_euler(EulerRot::XYZ).2;
+  let fov_rad = field_of_view.angle.to_radians();
+  let half_fov = fov_rad / 2.0;
 
-    // Angle between each ray, in radians
-    let angle_step = fov_rad / ((field_of_view.ray_count as f32) - 1.0).max(1.0);
-    let angle = player_angle - half_fov + angle_step * (ray_index as f32);
-    return Some(angle);
-  }
-  return None;
+  // Angle between each ray, in radians
+  let angle_step = fov_rad / ((field_of_view.ray_count as f32) - 1.0).max(1.0);
+  let angle = player_angle - half_fov + angle_step * (ray_index as f32);
+  return Some(angle);
 }
 
 pub struct Ray {
@@ -36,7 +34,7 @@ pub struct Ray {
   pub sec_point: Vec2,
 }
 
-pub fn ray_hit(ray: Ray, wall: Wall) -> Option<Vec2> {
+pub fn ray_hit(ray: &Ray, wall: &Wall) -> Option<Vec2> {
   let (x1, y1) = (ray.start.x, ray.start.y);
   let (x2, y2) = (ray.sec_point.x, ray.sec_point.y);
   let (x3, y3) = (wall.start.x, wall.start.y);
@@ -70,13 +68,15 @@ pub fn check_ray(
   if let Ok((transform, field_of_view)) = query.single() {
     for i in 0..field_of_view.ray_count {
       //Get each ray's angle based on the player's rotation and the field of view
-      if let Some(angle) = get_ray_angle(i, query) {
+      if let Some(angle) = get_ray_angle(i, transform, field_of_view) {
         let start = transform.translation;
         let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * field_of_view.max_distance;
         let ray = Ray { start: start.truncate(), sec_point: end.truncate() };
-        if let Some(ray) = ray_hit(ray, Wall::new(-100.0, -100.0, 100.0, 100.0)) {
-          println!("RAY HIT:{:?}", ray);
-          gizmos.circle_2d(Isometry2d::from_xy(ray.x, ray.y), 5.0, Color::srgb(0.0, 0.0, 1.0));
+        for wall in &map.walls {
+          if let Some(ray) = ray_hit(&ray, wall) {
+            println!("RAY HIT:{:?}", ray);
+            gizmos.circle_2d(Isometry2d::from_xy(ray.x, ray.y), 5.0, Color::srgb(0.0, 0.0, 1.0));
+          }
         }
       }
     }

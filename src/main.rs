@@ -27,7 +27,9 @@ fn main() {
     .add_systems(Update, ray::draw_ray)
     .add_systems(Update, map::draw_walls)
     .add_systems(Update, check_ray)
-    .insert_resource(Map { walls: vec![Wall::new(-100.0, -100.0, 100.0, 100.0)] })
+    .insert_resource(Map {
+      walls: vec![Wall::new(-100.0, -100.0, 100.0, 100.0), Wall::new(-100.0, 50.0, 100.0, 50.0)],
+    })
     .run();
 }
 

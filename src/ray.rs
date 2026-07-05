@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{ math::FloatPow, prelude::* };
 use crate::*;
 
 pub fn draw_ray(mut gizmos: Gizmos, query: Query<(&Transform, &FieldOfView), With<Player>>) {
@@ -72,10 +72,37 @@ pub fn check_ray(
         let start = transform.translation;
         let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * field_of_view.max_distance;
         let ray = Ray { start: start.truncate(), sec_point: end.truncate() };
+        let mut did_hit: bool = false;
+        let mut nearest_hit: Option<Vec2> = None;
+
         for wall in &map.walls {
-          if let Some(ray) = ray_hit(&ray, wall) {
-            println!("RAY HIT:{:?}", ray);
-            gizmos.circle_2d(Isometry2d::from_xy(ray.x, ray.y), 5.0, Color::srgb(0.0, 0.0, 1.0));
+          if let Some(hit) = ray_hit(&ray, wall) {
+            did_hit = true;
+            match did_hit {
+              false => {
+                nearest_hit = Some(hit);
+              }
+              true => {
+                match nearest_hit {
+                  None => {
+                    nearest_hit = Some(hit);
+                  }
+                  Some(mut nearest_hit) => {
+                    if
+                      transform.translation.truncate().distance(hit) <=
+                      transform.translation.truncate().distance(nearest_hit)
+                    {
+                      nearest_hit = hit;
+                    }
+                  }
+                }
+                gizmos.circle_2d(
+                  Isometry2d::from_xy(nearest_hit.unwrap().x, nearest_hit.unwrap().y),
+                  5.0,
+                  Color::srgb(0.0, 0.0, 1.0)
+                );
+              }
+            }
           }
         }
       }

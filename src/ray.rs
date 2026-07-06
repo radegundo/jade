@@ -1,18 +1,6 @@
 use bevy::{ math::FloatPow, prelude::* };
 use crate::*;
 
-pub fn draw_ray(mut gizmos: Gizmos, query: Query<(&Transform, &FieldOfView), With<Player>>) {
-  if let Ok((transform, field_of_view)) = query.single() {
-    for i in 0..field_of_view.ray_count {
-      if let Some(angle) = get_ray_angle(i, transform, field_of_view) {
-        let start = transform.translation;
-        let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * field_of_view.max_distance;
-        gizmos.line(start, end, Color::srgb(1.0, 0.0, 0.0));
-      }
-    }
-  }
-}
-
 pub fn get_ray_angle(
   ray_index: usize,
   transform: &Transform,
@@ -53,58 +41,37 @@ pub fn ray_hit(ray: &Ray, wall: &Wall) -> Option<Vec2> {
   }
   return None;
 }
-
-// #[derive(Component, Clone, Debug)]
-// pub struct Ray {
-//     pub dir: f32,
-//     pub length: f32,
-// }
-
-pub fn check_ray(
+pub fn draw_rays(
   mut gizmos: Gizmos,
   query: Query<(&Transform, &FieldOfView), With<Player>>,
   map: Res<Map>
 ) {
   if let Ok((transform, field_of_view)) = query.single() {
+    let origin = transform.translation.truncate();
+
     for i in 0..field_of_view.ray_count {
-      //Get each ray's angle based on the player's rotation and the field of view
+      // Get each ray's angle based on the player's rotation and the field of view
       if let Some(angle) = get_ray_angle(i, transform, field_of_view) {
         let start = transform.translation;
         let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * field_of_view.max_distance;
         let ray = Ray { start: start.truncate(), sec_point: end.truncate() };
-        let mut did_hit: bool = false;
+
         let mut nearest_hit: Option<Vec2> = None;
+        let mut nearest_dist_sq = f32::MAX;
 
         for wall in &map.walls {
           if let Some(hit) = ray_hit(&ray, wall) {
-            did_hit = true;
-            match did_hit {
-              false => {
-                nearest_hit = Some(hit);
-              }
-              true => {
-                match nearest_hit {
-                  None => {
-                    nearest_hit = Some(hit);
-                  }
-                  Some(mut nearest_hit) => {
-                    if
-                      transform.translation.truncate().distance(hit) <=
-                      transform.translation.truncate().distance(nearest_hit)
-                    {
-                      nearest_hit = hit;
-                    }
-                  }
-                }
-                gizmos.circle_2d(
-                  Isometry2d::from_xy(nearest_hit.unwrap().x, nearest_hit.unwrap().y),
-                  5.0,
-                  Color::srgb(0.0, 0.0, 1.0)
-                );
-              }
+            let dist_sq = origin.distance_squared(hit);
+            if dist_sq < nearest_dist_sq {
+              nearest_dist_sq = dist_sq;
+              nearest_hit = Some(hit);
             }
           }
         }
+
+        // Draw to the nearest hit, or the full ray length if nothing was hit
+        let draw_end = nearest_hit.unwrap_or(ray.sec_point);
+        gizmos.line(start, draw_end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));
       }
     }
   }

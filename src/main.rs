@@ -24,9 +24,9 @@ fn main() {
     .add_plugins(GridPlugin)
     .add_systems(Startup, setup)
     .add_systems(Update, input::input)
-    .add_systems(Update, ray::draw_ray)
+    .add_systems(Update, ray::draw_rays)
     .add_systems(Update, map::draw_walls)
-    .add_systems(Update, check_ray)
+    // .add_systems(Update, check_rays)
     .insert_resource(Map {
       walls: vec![Wall::new(-100.0, -100.0, 100.0, 100.0), Wall::new(-100.0, 50.0, 100.0, 50.0)],
     })

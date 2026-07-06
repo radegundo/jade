@@ -2,4 +2,4 @@
 **/*.rs.bk
 *.pdb
 pull-jade.sh
-.syncthing*
+*sync*

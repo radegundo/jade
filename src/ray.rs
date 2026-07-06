@@ -1,4 +1,4 @@
-use bevy::{ math::FloatPow, prelude::* };
+use bevy::prelude::*;
 use crate::*;
 
 pub fn get_ray_angle(

@@ -73,6 +73,4 @@ fn setup(
     resolution: WindowResolution::new(500, 500),
     ..Default::default()
   });
-
-  AAA;
 }

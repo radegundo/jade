@@ -2,4 +2,8 @@
 **/*.rs.bk
 *.pdb
 pull-jade.sh
-*sync*
+.stfolder/
+.stversions/
+.stignore
+*.sync-conflict-*
+.syncthing.*.tmp

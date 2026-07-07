@@ -66,4 +66,11 @@ fn setup(
     Mesh2d(meshes.add(Circle::new(10.0))),
     MeshMaterial2d(materials.add(ColorMaterial::from(Color::WHITE))),
   ));
+  //Spawn second window
+  commands.spawn(Window {
+    title: "Secondary window".into(),
+    resizable: false,
+    resolution: WindowResolution::new(500, 500),
+    ..Default::default()
+  });
 }

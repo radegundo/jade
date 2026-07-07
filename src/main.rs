@@ -68,13 +68,6 @@ fn setup(
     Mesh2d(meshes.add(Circle::new(10.0))),
     MeshMaterial2d(materials.add(ColorMaterial::from(Color::WHITE))),
   ));
-  //Spawn render window
-  commands.spawn(Window {
-    title: "Render Window".into(),
-    resizable: false,
-    resolution: WindowResolution::new(500, 500),
-    ..Default::default()
-  });
 }
 
 fn map_window(mut commands: Commands) {

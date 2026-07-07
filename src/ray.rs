@@ -42,7 +42,7 @@ pub fn ray_hit(ray: &Ray, wall: &Wall) -> Option<Vec2> {
   return None;
 }
 pub fn draw_rays(
-  mut gizmos: Gizmos,
+  mut gizmos: Gizmos<MapGizmos>,
   query: Query<(&Transform, &FieldOfView), With<Player>>,
   map: Res<Map>
 ) {

@@ -3,7 +3,6 @@ use bevy::{
   prelude::*,
   window::{ PrimaryWindow, WindowRef, WindowResolution },
 };
-use bevy_grid::{ self, Grid, GridPlugin, GridSize };
 
 use crate::map::*;
 
@@ -24,13 +23,11 @@ fn main() {
         ..default()
       })
     )
-    .add_plugins(GridPlugin)
     .add_systems(Startup, setup)
     .add_systems(Startup, setup_gizmo_layers)
     .add_systems(Update, input::input)
-    .add_systems(Update, ray::draw_rays)
+    .add_systems(Update, map::draw_rays)
     .add_systems(Update, map::draw_walls)
-    // .add_systems(Update, check_rays)
     .insert_resource(Map {
       walls: vec![Wall::new(-100.0, -100.0, 100.0, 100.0), Wall::new(-100.0, 50.0, 100.0, 50.0)],
     })
@@ -57,16 +54,9 @@ struct MapWindow {
 fn setup(
   mut commands: Commands,
   mut meshes: ResMut<Assets<Mesh>>,
-  mut materials: ResMut<Assets<ColorMaterial>>,
-  window_query: Query<&Window, With<PrimaryWindow>>
+  mut materials: ResMut<Assets<ColorMaterial>>
 ) {
   commands.spawn(Camera2d);
-  if let Ok(window) = window_query.single() {
-    let window_size = Vec2::new(window.width(), window.height());
-    let mut grid = Grid::new(GridSize { x: 8, y: 8 });
-    grid.build(window_size);
-    commands.insert_resource(grid);
-  }
 
   //Spawn Map Window
   let map_win = commands

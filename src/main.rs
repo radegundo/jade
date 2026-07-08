@@ -10,6 +10,7 @@ use crate::map::*;
 mod input;
 mod ray;
 mod map;
+mod render;
 
 fn main() {
   App::new()
@@ -47,6 +48,9 @@ struct FieldOfView {
   ray_count: usize,
   max_distance: f32,
 }
+
+#[derive(Resource, Default)]
+struct Hits(Vec<(Vec2, usize)>);
 
 fn setup(
   mut commands: Commands,

@@ -1,8 +1,9 @@
 use bevy::{
   camera::{ RenderTarget, visibility::RenderLayers },
   prelude::*,
-  window::{ PrimaryWindow, WindowRef, WindowResolution },
+  window::{ WindowRef, WindowResolution },
 };
+use bevy_grid::*;
 
 use crate::map::*;
 
@@ -28,6 +29,7 @@ fn main() {
     .add_systems(Update, input::input)
     .add_systems(Update, map::draw_rays)
     .add_systems(Update, map::draw_walls)
+    .add_systems(Update, draw_map_grid)
     .insert_resource(Map {
       walls: vec![Wall::new(-100.0, -100.0, 100.0, 100.0), Wall::new(-100.0, 50.0, 100.0, 50.0)],
     })
@@ -46,11 +48,6 @@ struct FieldOfView {
   max_distance: f32,
 }
 
-#[derive(Resource)]
-struct MapWindow {
-  id: Entity,
-}
-
 fn setup(
   mut commands: Commands,
   mut meshes: ResMut<Assets<Mesh>>,
@@ -59,9 +56,16 @@ fn setup(
   commands.spawn(Camera2d);
 
   //Spawn Map Window
+  let resolution: WindowResolution = (500, 500).into();
+  let window_size = Vec2::new(resolution.width(), resolution.height());
+
   let map_win = commands
-    .spawn(Window { resolution: (500, 500).into(), resizable: false, ..default() })
+    .spawn((Window { resolution: resolution, resizable: false, ..default() }, MapWindowMarker))
     .id();
+
+  let mut grid = Grid::new(GridSize { x: 8, y: 8 });
+  grid.build(window_size);
+  commands.insert_resource(grid);
 
   //Spawn Map Camera
   commands.spawn((
@@ -90,7 +94,7 @@ fn setup(
 
 //Setup for different Gizmo configs
 #[derive(Default, Reflect, GizmoConfigGroup)]
-struct MapGizmos;
+pub struct MapGizmos;
 
 fn setup_gizmo_layers(mut config_store: ResMut<GizmoConfigStore>) {
   let (config, _) = config_store.config_mut::<MapGizmos>();

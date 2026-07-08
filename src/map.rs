@@ -60,3 +60,25 @@ pub fn draw_rays(
     }
   }
 }
+
+pub fn draw_map_grid(
+  mut grid_o: Option<ResMut<Grid>>,
+  mut gizmos: Gizmos<MapGizmos>,
+  window_query: Query<&Window, With<MapWindowMarker>>
+) {
+  if let Some(mut grid) = grid_o {
+    if let Ok(window) = window_query.single() {
+      let window_size = Vec2::new(window.width(), window.height());
+      grid.draw(&mut gizmos);
+      grid.update_grid(window_size);
+    }
+  }
+}
+
+#[derive(Resource)]
+pub struct MapWindow {
+  pub id: Entity,
+}
+
+#[derive(Component)]
+pub struct MapWindowMarker;

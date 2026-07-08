@@ -22,7 +22,7 @@ fn main() {
       DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
           title: "My Bevy App".to_string(),
-          resolution: WindowResolution::new(500, 500),
+          resolution: WindowResolution::new(1920, 1080),
           resizable: false,
           ..default()
         }),

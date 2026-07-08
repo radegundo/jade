@@ -1,32 +1,48 @@
-use bevy::prelude::*;
+use bevy::{ prelude::* };
 
 use crate::Player;
 
 pub fn input(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut player_query: Query<&mut Transform, With<Player>>
+  keyboard_input: Res<ButtonInput<KeyCode>>,
+  mut player_query: Query<&mut Transform, With<Player>>,
+  time: Res<Time>
 ) {
-    if let Ok(mut transform) = player_query.single_mut() {
-        let mut dir = Vec3::ZERO;
-        if keyboard_input.pressed(KeyCode::KeyD) {
-            dir.x += 10.0;
-        }
-        if keyboard_input.pressed(KeyCode::KeyA) {
-            dir.x -= 10.0;
-        }
-        if keyboard_input.pressed(KeyCode::KeyW) {
-            dir.y += 10.0;
-        }
-        if keyboard_input.pressed(KeyCode::KeyS) {
-            dir.y -= 10.0;
-        }
-        transform.translation += dir;
+  if let Ok(mut transform) = player_query.single_mut() {
+    let angle = transform.rotation.to_euler(EulerRot::XYZ).2;
+    let forward = Vec2::new(angle.cos(), angle.sin());
+    let right = Vec2::new(-forward.y, forward.x); // perpendicular to forward
 
-        if keyboard_input.pressed(KeyCode::KeyE) {
-            transform.rotation *= Quat::from_rotation_z(-0.1);
-        }
-        if keyboard_input.pressed(KeyCode::KeyQ) {
-            transform.rotation *= Quat::from_rotation_z(0.1);
-        }
+    let speed = 200.0; // units per second
+    let mut movement = Vec2::ZERO;
+
+    if keyboard_input.pressed(KeyCode::KeyW) {
+      movement += forward;
     }
+    if keyboard_input.pressed(KeyCode::KeyS) {
+      movement -= forward;
+    }
+    if keyboard_input.pressed(KeyCode::KeyD) {
+      movement += right;
+    }
+    if keyboard_input.pressed(KeyCode::KeyA) {
+      movement -= right;
+    }
+
+    if movement != Vec2::ZERO {
+      movement = movement.normalize() * speed * time.delta_secs();
+      transform.translation += movement.extend(0.0);
+    }
+
+    let turn_speed = 5.0; // radians per second
+    let mut rotation = 0.0;
+
+    if keyboard_input.pressed(KeyCode::KeyQ) {
+      rotation -= turn_speed * time.delta_secs();
+    }
+    if keyboard_input.pressed(KeyCode::KeyE) {
+      rotation += turn_speed * time.delta_secs();
+    }
+
+    transform.rotate_z(rotation);
+  }
 }

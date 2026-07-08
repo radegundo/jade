@@ -12,6 +12,8 @@ mod ray;
 mod map;
 mod render;
 
+const RAY_COUNT: usize = 100;
+
 fn main() {
   App::new()
     .add_plugins(
@@ -31,9 +33,11 @@ fn main() {
     .add_systems(Update, map::draw_rays)
     .add_systems(Update, map::draw_walls)
     .add_systems(Update, draw_map_grid)
+    .add_systems(Update, ray::get_hits)
     .insert_resource(Map {
       walls: vec![Wall::new(-100.0, -100.0, 100.0, 100.0), Wall::new(-100.0, 50.0, 100.0, 50.0)],
     })
+    .insert_resource(Hits::default())
     .init_gizmo_group::<MapGizmos>()
     .run();
 }
@@ -49,8 +53,14 @@ struct FieldOfView {
   max_distance: f32,
 }
 
-#[derive(Resource, Default)]
-struct Hits(Vec<(Vec2, usize)>);
+#[derive(Resource)]
+struct Hits([Option<Vec2>; RAY_COUNT]);
+
+impl Default for Hits {
+  fn default() -> Self {
+    Hits([None; RAY_COUNT])
+  }
+}
 
 fn setup(
   mut commands: Commands,
@@ -85,7 +95,7 @@ fn setup(
     Player,
     FieldOfView {
       angle: 70.0,
-      ray_count: 100,
+      ray_count: RAY_COUNT,
       max_distance: 1000.0,
     },
     Transform::default(),

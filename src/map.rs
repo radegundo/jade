@@ -28,40 +28,26 @@ pub fn draw_walls(map: Res<Map>, mut gizmos: Gizmos<MapGizmos>) {
 pub fn draw_rays(
   mut gizmos: Gizmos<MapGizmos>,
   query: Query<(&Transform, &FieldOfView), With<Player>>,
-  map: Res<Map>
+  hits: Res<Hits>
 ) {
   if let Ok((transform, field_of_view)) = query.single() {
-    let origin = transform.translation.truncate();
-
-    for i in 0..field_of_view.ray_count {
+    for i in 0..RAY_COUNT {
       // Get each ray's angle based on the player's rotation and the field of view
       let angle = get_ray_angle(i, transform, field_of_view);
       let start = transform.translation;
       let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * field_of_view.max_distance;
       let ray = Ray { start: start.truncate(), sec_point: end.truncate() };
 
-      let mut nearest_hit: Option<Vec2> = None;
-      let mut nearest_dist_sq = f32::MAX;
-
-      for wall in &map.walls {
-        if let Some(hit) = ray_hit(&ray, wall) {
-          let dist_sq = origin.distance_squared(hit);
-          if dist_sq < nearest_dist_sq {
-            nearest_dist_sq = dist_sq;
-            nearest_hit = Some(hit);
-          }
-        }
-      }
+      let draw_end = hits.0[i].unwrap_or(ray.sec_point);
 
       // Draw to the nearest hit, or the full ray length if nothing was hit
-      let draw_end = nearest_hit.unwrap_or(ray.sec_point);
       gizmos.line(start, draw_end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));
     }
   }
 }
 
 pub fn draw_map_grid(
-  mut grid_o: Option<ResMut<Grid>>,
+  grid_o: Option<ResMut<Grid>>,
   mut gizmos: Gizmos<MapGizmos>,
   window_query: Query<&Window, With<MapWindowMarker>>
 ) {

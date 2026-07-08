@@ -43,7 +43,6 @@ pub fn get_hits(
   mut hits: ResMut<Hits>,
   map: Res<Map>
 ) {
-  let mut hits: Vec<(Vec2, usize)> = Vec::new();
   if let Ok((transform, field_of_view)) = query.single() {
     let origin = transform.translation.truncate();
     for i in 0..field_of_view.ray_count {
@@ -63,10 +62,12 @@ pub fn get_hits(
             nearest_dist_sq = dist_sq;
             nearest_hit = Some(hit);
           }
-          if let Some(n_hit) = nearest_hit {
-            hits.push((n_hit, i));
-          }
         }
+      }
+      if let Some(_) = nearest_hit {
+        hits.0[i] = nearest_hit;
+      } else {
+        hits.0[i] = None;
       }
     }
   }

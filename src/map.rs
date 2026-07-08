@@ -21,7 +21,7 @@ impl Wall {
 
 pub fn draw_walls(map: Res<Map>, mut gizmos: Gizmos<MapGizmos>) {
   for wall in &map.walls {
-    gizmos.line(wall.start.extend(0.0), wall.end.extend(0.0), Color::WHITE);
+    gizmos.line(wall.start.extend(0.0), wall.end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));
   }
 }
 

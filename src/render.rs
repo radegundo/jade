@@ -16,13 +16,18 @@ pub fn render(
     let window_size = window.size();
     for i in 0..RAY_COUNT {
       let line_width = window_size.x / (RAY_COUNT as f32);
+
       let iso = Isometry2d::from_xy(
         line_width * ((i as f32) - (RAY_COUNT as f32) / 2.0) + line_width / 2.0,
         0.0
       );
+      let player_angle = transform.rotation.to_euler(EulerRot::XYZ).2;
+      let ray_angle = get_ray_angle(i, transform, field_of_view);
+      let relative_angle = ray_angle - player_angle; // offset from center of FOV
+
       let mut line_height: f32 = 0.0;
       if let Some(hit) = hits.0[i] {
-        let dist = origin.distance(hit);
+        let dist = origin.distance(hit) * relative_angle.cos();
         if dist <= field_of_view.max_distance {
           line_height = (WALL_HEIGHT * window_size.y) / dist;
         }

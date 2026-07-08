@@ -38,7 +38,14 @@ fn main() {
     .add_systems(Update, ray::get_hits)
     .add_systems(Update, render)
     .insert_resource(Map {
-      walls: vec![Wall::new(-100.0, -100.0, 100.0, 100.0), Wall::new(-100.0, 50.0, 100.0, 50.0)],
+      walls: vec![
+        Wall::new(-100.0, -100.0, 100.0, 100.0),
+        Wall::new(-100.0, 50.0, 100.0, 50.0),
+        Wall::new(-200.0, -200.0, -200.0, 200.0),
+        Wall::new(-200.0, 200.0, 200.0, 200.0),
+        Wall::new(-200.0, -200.0, 200.0, -200.0),
+        Wall::new(200.0, 200.0, 200.0, -200.0)
+      ],
     })
     .insert_resource(Hits::default())
     .init_gizmo_group::<MapGizmos>()

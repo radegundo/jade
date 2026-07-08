@@ -6,6 +6,7 @@ use bevy::{
 use bevy_grid::*;
 
 use crate::map::*;
+use render::*;
 
 mod input;
 mod ray;
@@ -13,6 +14,7 @@ mod map;
 mod render;
 
 const RAY_COUNT: usize = 100;
+const WALL_HEIGHT: f32 = 20.0;
 
 fn main() {
   App::new()
@@ -34,6 +36,7 @@ fn main() {
     .add_systems(Update, map::draw_walls)
     .add_systems(Update, draw_map_grid)
     .add_systems(Update, ray::get_hits)
+    .add_systems(Update, render)
     .insert_resource(Map {
       walls: vec![Wall::new(-100.0, -100.0, 100.0, 100.0), Wall::new(-100.0, 50.0, 100.0, 50.0)],
     })
@@ -49,7 +52,6 @@ struct Player;
 #[derive(Component)]
 struct FieldOfView {
   angle: f32,
-  ray_count: usize,
   max_distance: f32,
 }
 
@@ -95,8 +97,7 @@ fn setup(
     Player,
     FieldOfView {
       angle: 70.0,
-      ray_count: RAY_COUNT,
-      max_distance: 1000.0,
+      max_distance: 500.0,
     },
     Transform::default(),
     Mesh2d(meshes.add(Circle::new(10.0))),

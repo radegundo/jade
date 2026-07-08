@@ -7,7 +7,7 @@ pub fn get_ray_angle(ray_index: usize, transform: &Transform, field_of_view: &Fi
   let half_fov = fov_rad / 2.0;
 
   // Angle between each ray, in radians
-  let angle_step = fov_rad / ((field_of_view.ray_count as f32) - 1.0).max(1.0);
+  let angle_step = fov_rad / ((RAY_COUNT as f32) - 1.0).max(1.0);
   let angle = player_angle - half_fov + angle_step * (ray_index as f32);
   angle
 }
@@ -45,7 +45,7 @@ pub fn get_hits(
 ) {
   if let Ok((transform, field_of_view)) = query.single() {
     let origin = transform.translation.truncate();
-    for i in 0..field_of_view.ray_count {
+    for i in 0..RAY_COUNT {
       // Get each ray's angle based on the player's rotation and the field of view
       let angle = get_ray_angle(i, transform, field_of_view);
       let start = transform.translation;

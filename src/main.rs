@@ -13,7 +13,9 @@ mod ray;
 mod map;
 mod render;
 
-const RAY_COUNT: usize = 100;
+//Screen width
+const RAY_COUNT: usize = 1920;
+const WINDOW_HEIGHT: u32 = 1080;
 const WALL_HEIGHT: f32 = 20.0;
 
 fn main() {
@@ -22,7 +24,7 @@ fn main() {
       DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
           title: "My Bevy App".to_string(),
-          resolution: WindowResolution::new(1920, 1080),
+          resolution: WindowResolution::new(RAY_COUNT as u32, WINDOW_HEIGHT),
           resizable: false,
           ..default()
         }),
@@ -32,9 +34,7 @@ fn main() {
     .add_systems(Startup, setup)
     .add_systems(Startup, setup_gizmo_layers)
     .add_systems(Update, input::input)
-    .add_systems(Update, map::draw_rays)
-    .add_systems(Update, map::draw_walls)
-    .add_systems(Update, draw_map_grid)
+    .add_plugins(MapPlugin)
     .add_systems(Update, ray::get_hits)
     .add_systems(Update, render)
     .insert_resource(Map {
@@ -57,9 +57,11 @@ fn main() {
 struct Player;
 
 #[derive(Component)]
-struct FieldOfView {
+struct ViewInfo {
   angle: f32,
   max_distance: f32,
+  //Distance which the screen sits from the players point of view
+  view_distance: f32,
 }
 
 #[derive(Resource)]
@@ -102,9 +104,10 @@ fn setup(
   //Spawn Map player
   commands.spawn((
     Player,
-    FieldOfView {
+    ViewInfo {
       angle: 70.0,
       max_distance: 500.0,
+      view_distance: 50.0,
     },
     Transform::default(),
     Mesh2d(meshes.add(Circle::new(10.0))),

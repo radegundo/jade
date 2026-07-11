@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 use crate::*;
 
-pub fn get_ray_angle(ray_index: usize, transform: &Transform, field_of_view: &FieldOfView) -> f32 {
+pub fn get_ray_angle(ray_index: usize, transform: &Transform, view_info: &ViewInfo) -> f32 {
   let player_angle = transform.rotation.to_euler(EulerRot::XYZ).2;
-  let fov_rad = field_of_view.angle.to_radians();
+  let fov_rad = view_info.angle.to_radians();
   let half_fov = fov_rad / 2.0;
 
   // Angle between each ray, in radians
@@ -39,17 +39,17 @@ pub fn ray_hit(ray: &Ray, wall: &Wall) -> Option<Vec2> {
 }
 
 pub fn get_hits(
-  query: Query<(&Transform, &FieldOfView), With<Player>>,
+  query: Query<(&Transform, &ViewInfo), With<Player>>,
   mut hits: ResMut<Hits>,
   map: Res<Map>
 ) {
-  if let Ok((transform, field_of_view)) = query.single() {
+  if let Ok((transform, view_info)) = query.single() {
     let origin = transform.translation.truncate();
     for i in 0..RAY_COUNT {
       // Get each ray's angle based on the player's rotation and the field of view
-      let angle = get_ray_angle(i, transform, field_of_view);
+      let angle = get_ray_angle(i, transform, view_info);
       let start = transform.translation;
-      let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * field_of_view.max_distance;
+      let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * view_info.max_distance;
       let ray = Ray { start: start.truncate(), sec_point: end.truncate() };
 
       let mut nearest_hit: Option<Vec2> = None;

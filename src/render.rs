@@ -1,4 +1,4 @@
-use bevy::{ prelude::*, window::PrimaryWindow };
+use bevy::{ prelude::*, text::FontSource::Math, transform, window::PrimaryWindow };
 
 use crate::*;
 use ray::*;
@@ -35,11 +35,21 @@ pub fn render(
   //   }
   // }
   if let Ok((transform, view_info)) = query.single() && let Ok(window) = window_query.single() {
-    //GET PLAYER COORDS
-    // THROW OUT WALLS WITH Y < 0
+    // THROW OUT WALLS WITH Y < 0 -> Get relative coords
     // FIGURE OUT CLIPPING??
-    // BSP??
+    // BSP?? -> Render per sector
     // GET WALL X COORDS ON SCREEN
     // IDEK MAN
   }
+}
+
+pub fn get_relative_coords(transform: &Transform, coords: Vec2) -> Vec2 {
+  let dx = coords.x - transform.translation.x;
+  let dy = coords.y - transform.translation.y;
+
+  let angle = transform.rotation.to_euler(EulerRot::YXZ).0;
+  let relX = dx * angle.cos() + dy * angle.sin();
+  let relY = -dx * angle.sin() + dy * angle.cos();
+
+  Vec2::new(relX, relY)
 }

@@ -1,11 +1,15 @@
 use bevy::{
   camera::{ RenderTarget, visibility::RenderLayers },
+  input::InputPlugin,
   prelude::*,
   window::{ WindowRef, WindowResolution },
 };
 use bevy_grid::*;
 
-use crate::map::*;
+use crate::{
+  input::OwnInputPlugin,
+  map::{ absolute_map::AbsoluteMapPlugin, relative_map::RelativeMapPlugin, * },
+};
 use render::*;
 
 mod input;
@@ -33,8 +37,10 @@ fn main() {
     )
     .add_systems(Startup, setup)
     .add_systems(Startup, setup_gizmo_layers)
-    .add_systems(Update, input::input)
-    .add_plugins(MapPlugin)
+    .add_plugins(OwnInputPlugin)
+    .add_plugins(AbsoluteMapPlugin)
+    .add_plugins(RelativeMapPlugin)
+    .init_state::<MapViewMode>()
     .add_systems(Update, ray::get_hits)
     .add_systems(Update, render)
     .insert_resource(Map {
@@ -47,6 +53,11 @@ fn main() {
         Wall::new(200.0, 200.0, 200.0, -200.0)
       ],
     })
+    .insert_resource(ViewInfo {
+      angle: 70.0,
+      max_distance: 500.0,
+      view_distance: 50.0,
+    })
     .insert_resource(Hits::default())
     .init_gizmo_group::<MapGizmos>()
     .run();
@@ -56,12 +67,12 @@ fn main() {
 #[derive(Component)]
 struct Player;
 
-#[derive(Component)]
-struct ViewInfo {
-  angle: f32,
-  max_distance: f32,
+#[derive(Resource)]
+pub struct ViewInfo {
+  pub angle: f32,
+  pub max_distance: f32,
   //Distance which the screen sits from the players point of view
-  view_distance: f32,
+  pub view_distance: f32,
 }
 
 #[derive(Resource)]
@@ -104,16 +115,9 @@ fn setup(
   //Spawn Map player
   commands.spawn((
     Player,
-    ViewInfo {
-      angle: 70.0,
-      max_distance: 500.0,
-      view_distance: 50.0,
-    },
     Transform::default(),
     Mesh2d(meshes.add(Circle::new(10.0))),
     MeshMaterial2d(materials.add(ColorMaterial::from(Color::WHITE))),
-    RenderLayers::layer(1),
-    RenderTarget::Window(WindowRef::Entity(map_win)),
   ));
 }
 

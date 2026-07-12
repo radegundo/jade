@@ -1,36 +1,32 @@
-use bevy::prelude::*;
+use bevy::{ prelude::*, transform };
 
-use crate::*;
+use crate::{ map::MapViewMode, * };
 use ray::*;
 
-#[derive(Resource)]
-pub struct Map {
-  pub walls: Vec<Wall>,
-}
+pub struct AbsoluteMapPlugin;
 
-pub struct Wall {
-  pub start: Vec2,
-  pub end: Vec2,
-}
-
-pub struct MapPlugin;
-
-impl Plugin for MapPlugin {
+impl Plugin for AbsoluteMapPlugin {
   fn build(&self, app: &mut App) {
-    app
-      .add_systems(Update, draw_walls)
-      .add_systems(Update, draw_rays)
-      .add_systems(Update, draw_map_grid);
+    app.add_systems(
+      Update,
+      (draw_walls, draw_rays, draw_map_grid, draw_player).distributive_run_if(
+        in_state(MapViewMode::Absolute)
+      )
+    );
   }
 }
 
 impl Wall {
   pub fn new(x0: f32, y0: f32, x1: f32, y1: f32) -> Self {
-    Wall { start: Vec2::new(x0, y0), end: Vec2::new(x1, y1) }
+    Wall { start: Vec2::new(x0, y0), end: Vec2::new(x1, y1), ..default() }
   }
 }
 
-pub fn draw_walls(map: Res<Map>, mut gizmos: Gizmos<MapGizmos>) {
+pub fn draw_walls(
+  map: Res<Map>,
+  mut gizmos: Gizmos<MapGizmos>,
+  player_query: Query<&Transform, With<Player>>
+) {
   for wall in &map.walls {
     gizmos.line(wall.start.extend(0.0), wall.end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));
   }
@@ -38,10 +34,12 @@ pub fn draw_walls(map: Res<Map>, mut gizmos: Gizmos<MapGizmos>) {
 
 pub fn draw_rays(
   mut gizmos: Gizmos<MapGizmos>,
-  query: Query<(&Transform, &ViewInfo), With<Player>>,
-  hits: Res<Hits>
+  query: Query<&Transform, With<Player>>,
+  hits: Res<Hits>,
+  view_info: Res<ViewInfo>
 ) {
-  if let Ok((transform, view_info)) = query.single() {
+  let view_info = view_info.into_inner();
+  if let Ok(transform) = query.single() {
     for i in 0..RAY_COUNT {
       // Get each ray's angle based on the player's rotation and the field of view
       let angle = get_ray_angle(i, transform, view_info);
@@ -71,10 +69,13 @@ pub fn draw_map_grid(
   }
 }
 
-#[derive(Resource)]
-pub struct MapWindow {
-  pub id: Entity,
+fn draw_player(player_query: Query<&Transform, With<Player>>, mut gizmos: Gizmos<MapGizmos>) {
+  if let Ok(transform) = player_query.single() {
+    let transform = transform.translation;
+    gizmos.circle_2d(
+      Isometry2d::from_xy(transform.x, transform.y),
+      5.0,
+      Color::srgb(1.0, 1.0, 1.0)
+    );
+  }
 }
-
-#[derive(Component)]
-pub struct MapWindowMarker;

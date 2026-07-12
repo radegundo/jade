@@ -39,12 +39,14 @@ pub fn ray_hit(ray: &Ray, wall: &Wall) -> Option<Vec2> {
 }
 
 pub fn get_hits(
-  query: Query<(&Transform, &ViewInfo), With<Player>>,
+  query: Query<&Transform, With<Player>>,
   mut hits: ResMut<Hits>,
-  map: Res<Map>
+  map: Res<Map>,
+  view_info: Res<ViewInfo>
 ) {
-  if let Ok((transform, view_info)) = query.single() {
+  if let Ok(transform) = query.single() {
     let origin = transform.translation.truncate();
+    let view_info = view_info.into_inner();
     for i in 0..RAY_COUNT {
       // Get each ray's angle based on the player's rotation and the field of view
       let angle = get_ray_angle(i, transform, view_info);

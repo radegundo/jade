@@ -17,43 +17,41 @@ impl Plugin for RelativeMapPlugin {
 pub fn draw_walls(
     map: Res<Map>,
     mut gizmos: Gizmos<MapGizmos>,
-    player_query: Query<&Transform, With<Player>>
+    player_cache: Res<PlayerCameraCache>
 ) {
     for wall in &map.walls {
-        if let Ok(transform) = player_query.single() {
-            let start: Vec2 = get_relative_coords(transform, wall.start);
-            let end: Vec2 = get_relative_coords(transform, wall.end);
-            gizmos.line(start.extend(0.0), end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));
-        }
+        let transform = &player_cache.transform;
+        let start: Vec2 = get_relative_coords(transform, wall.start);
+        let end: Vec2 = get_relative_coords(transform, wall.end);
+        gizmos.line(start.extend(0.0), end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));
     }
 }
 
 pub fn draw_rays(
     mut gizmos: Gizmos<MapGizmos>,
-    query: Query<&Transform, With<Player>>,
+    player_cache: Res<PlayerCameraCache>,
     hits: Res<Hits>,
     view_info: Res<ViewInfo>
 ) {
     let view_info = view_info.into_inner();
-    if let Ok(transform) = query.single() {
-        for i in 0..RAY_COUNT {
-            // Get each ray's angle based on the player's rotation and the field of view
-            let angle = get_ray_angle(i, transform, view_info);
+    let transform = &player_cache.transform;
+    for i in 0..RAY_COUNT {
+        // Get each ray's angle based on the player's rotation and the field of view
+        let angle = get_ray_angle(i, transform, view_info);
 
-            let start = transform.translation;
-            //Relative start is always the origin
-            let start_rel = Vec3::ZERO;
+        let start = transform.translation;
+        //Relative start is always the origin
+        let start_rel = Vec3::ZERO;
 
-            let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * view_info.max_distance;
-            //Get the relative end
-            //Not needed but kept for readability
-            // let end_rel = get_relative_coords(transform, end.truncate()).extend(0.0);
+        let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * view_info.max_distance;
+        //Get the relative end
+        //Not needed but kept for readability
+        // let end_rel = get_relative_coords(transform, end.truncate()).extend(0.0);
 
-            let draw_end = get_relative_coords(transform, hits.0[i].unwrap_or(end.truncate()));
+        let draw_end = get_relative_coords(transform, hits.0[i].unwrap_or(end.truncate()));
 
-            // Draw to the nearest hit, or the full ray length if nothing was hit
-            gizmos.line(start_rel, draw_end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));
-        }
+        // Draw to the nearest hit, or the full ray length if nothing was hit
+        gizmos.line(start_rel, draw_end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));
     }
 }
 

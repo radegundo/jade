@@ -15,15 +15,17 @@ impl Plugin for RelativeMapPlugin {
 }
 
 pub fn draw_walls(
-    map: Res<Map>,
+    map: Res<Map2>,
     mut gizmos: Gizmos<MapGizmos>,
     player_cache: Res<PlayerCameraCache>
 ) {
-    for wall in &map.walls {
-        let transform = &player_cache.transform;
-        let start: Vec2 = get_relative_coords(transform, wall.start);
-        let end: Vec2 = get_relative_coords(transform, wall.end);
-        gizmos.line(start.extend(0.0), end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));
+    for sector in &map.sectors {
+        for wall in &sector.walls {
+            let transform = &player_cache.transform;
+            let start: Vec2 = get_relative_coords(transform, wall.start);
+            let end: Vec2 = get_relative_coords(transform, wall.end);
+            gizmos.line(start.extend(0.0), end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));
+        }
     }
 }
 

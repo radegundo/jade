@@ -1,6 +1,5 @@
 use bevy::{
     camera::{ RenderTarget, visibility::RenderLayers },
-    input::InputPlugin,
     prelude::*,
     window::{ WindowRef, WindowResolution },
 };
@@ -49,7 +48,10 @@ fn main() {
         .add_systems(Update, ray::get_hits)
         .add_systems(Update, render)
         .insert_resource(Map {
-            walls: vec![Wall::new(-100.0, 100.0, 0.0, 0.0)],
+            walls: vec![LineDef::new(-100.0, 100.0, 0.0, 0.0)],
+        })
+        .insert_resource(Map2 {
+            sectors: vec![Sector { walls: vec![LineDef::new(-100.0, 100.0, 0.0, 0.0)] }],
         })
         .insert_resource(ViewInfo::default())
         .insert_resource(Hits::default())
@@ -96,11 +98,7 @@ pub struct PlayerCameraCache {
     transform: Transform,
 }
 
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>
-) {
+fn setup(mut commands: Commands) {
     commands.spawn(Camera2d);
 
     //Spawn Map Window

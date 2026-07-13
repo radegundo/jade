@@ -4,28 +4,38 @@ pub mod relative_map;
 use bevy::prelude::*;
 
 #[derive(Resource)]
+pub struct Sector {
+    pub walls: Vec<LineDef>,
+}
+
+#[derive(Resource)]
+pub struct Map2 {
+    pub sectors: Vec<Sector>,
+}
+
+#[derive(Resource)]
 pub struct Map {
-  pub walls: Vec<Wall>,
+    pub walls: Vec<LineDef>,
 }
 
 #[derive(Default)]
-pub struct Wall {
-  pub start: Vec2,
-  pub end: Vec2,
-  pub front_side_def: SideDef,
-  pub back_side_def: Option<SideDef>,
+pub struct LineDef {
+    pub start: Vec2,
+    pub end: Vec2,
+    pub front_side_def: SideDef,
+    pub back_side_def: Option<SideDef>,
 }
 
 #[derive(Default)]
 pub struct SideDef {
-  upper_texture: Option<Color>,
-  middle_texture: Option<Color>,
-  lower_texture: Option<Color>,
+    upper_texture: Option<Color>,
+    middle_texture: Option<Color>,
+    lower_texture: Option<Color>,
 }
 
 #[derive(Resource)]
 pub struct MapWindow {
-  pub id: Entity,
+    pub id: Entity,
 }
 
 #[derive(Component)]
@@ -33,7 +43,13 @@ pub struct MapWindowMarker;
 
 #[derive(States, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
 pub enum MapViewMode {
-  #[default]
-  Relative,
-  Absolute,
+    #[default]
+    Relative,
+    Absolute,
+}
+
+impl LineDef {
+    pub fn new(x0: f32, y0: f32, x1: f32, y1: f32) -> Self {
+        LineDef { start: Vec2::new(x0, y0), end: Vec2::new(x1, y1), ..default() }
+    }
 }

@@ -1,4 +1,4 @@
-use bevy::{ prelude::*, transform };
+use bevy::prelude::*;
 
 use crate::{ map::MapViewMode, * };
 use ray::*;
@@ -16,15 +16,11 @@ impl Plugin for AbsoluteMapPlugin {
     }
 }
 
-impl Wall {
-    pub fn new(x0: f32, y0: f32, x1: f32, y1: f32) -> Self {
-        Wall { start: Vec2::new(x0, y0), end: Vec2::new(x1, y1), ..default() }
-    }
-}
-
-pub fn draw_walls(map: Res<Map>, mut gizmos: Gizmos<MapGizmos>) {
-    for wall in &map.walls {
-        gizmos.line(wall.start.extend(0.0), wall.end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));
+pub fn draw_walls(map: Res<Map2>, mut gizmos: Gizmos<MapGizmos>) {
+    for sector in &map.sectors {
+        for wall in &sector.walls {
+            gizmos.line(wall.start.extend(0.0), wall.end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));
+        }
     }
 }
 
@@ -41,9 +37,8 @@ pub fn draw_rays(
         let angle = get_ray_angle(i, transform, view_info);
         let start = transform.translation;
         let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * view_info.max_distance;
-        let ray = Ray { start: start.truncate(), sec_point: end.truncate() };
 
-        let draw_end = hits.0[i].unwrap_or(ray.sec_point);
+        let draw_end = hits.0[i].unwrap_or(end.truncate());
 
         // Draw to the nearest hit, or the full ray length if nothing was hit
         gizmos.line(start, draw_end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));

@@ -1,4 +1,4 @@
-use bevy::{ prelude::*, text::FontSource::Math, transform, window::PrimaryWindow };
+use bevy::prelude::*;
 
 use crate::*;
 use ray::*;
@@ -11,7 +11,7 @@ pub fn render(
 ) {
     for i in 0..RAY_COUNT {
         if let Some(hit) = hits.0[i] {
-            let x = hit_to_screen_x(&view_info, &hits, i);
+            let x = hit_to_screen_x(&view_info, i);
             let transform = player_cache.transform;
             let wall_bottom = 0.0;
             let wall_top = wall_bottom + WALL_HEIGHT;
@@ -43,8 +43,8 @@ pub fn get_relative_coords(transform: &Transform, coords: Vec2) -> Vec2 {
     let dy = coords.y - transform.translation.y;
 
     let angle = transform.rotation.to_euler(EulerRot::YXZ).0;
-    let relX = dx * angle.cos() + dy * angle.sin();
-    let relY = -dx * angle.sin() + dy * angle.cos();
+    let rel_x = dx * angle.cos() + dy * angle.sin();
+    let rel_y = -dx * angle.sin() + dy * angle.cos();
 
-    Vec2::new(relX, relY)
+    Vec2::new(rel_x, rel_y)
 }

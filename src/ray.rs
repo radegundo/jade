@@ -1,7 +1,12 @@
-use std::mem::transmute;
-
 use bevy::prelude::*;
 use crate::*;
+
+//Only used for translating for ray_hit function for now
+struct Ray {
+    start: Vec2,
+    //Sample a point in the direction of the ray
+    sec_point: Vec2,
+}
 
 pub fn get_ray_angle(ray_index: usize, transform: &Transform, view_info: &ViewInfo) -> f32 {
     let player_angle = transform.rotation.to_euler(EulerRot::XYZ).2;
@@ -22,13 +27,7 @@ pub fn get_ray_offset(ray_index: usize, view_info: &ViewInfo) -> f32 {
     -half_fov + angle_step * (ray_index as f32)
 }
 
-pub struct Ray {
-    pub start: Vec2,
-    //Sample a point in the direction of the ray
-    pub sec_point: Vec2,
-}
-
-pub fn ray_hit(ray: &Ray, wall: &Wall) -> Option<Vec2> {
+fn ray_hit(ray: &Ray, wall: &LineDef) -> Option<Vec2> {
     let (x1, y1) = (ray.start.x, ray.start.y);
     let (x2, y2) = (ray.sec_point.x, ray.sec_point.y);
     let (x3, y3) = (wall.start.x, wall.start.y);
@@ -84,7 +83,11 @@ pub fn get_hits(
     }
 }
 
-pub fn hit_to_screen_x(view_info: &ViewInfo, hits: &Hits, ray_index: usize) -> f32 {
+pub fn get_sector_hits(sector: Sector, player_cache: Res<PlayerCameraCache>, view_info: &ViewInfo) {
+    //GET HITS FOR GIVEN SECTOR
+}
+
+pub fn hit_to_screen_x(view_info: &ViewInfo, ray_index: usize) -> f32 {
     let angle = get_ray_offset(ray_index, &view_info);
     view_info.view_distance * angle.tan()
 }

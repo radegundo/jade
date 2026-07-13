@@ -1,3 +1,5 @@
+use std::mem::transmute;
+
 use bevy::prelude::*;
 use crate::*;
 
@@ -10,6 +12,14 @@ pub fn get_ray_angle(ray_index: usize, transform: &Transform, view_info: &ViewIn
     let angle_step = fov_rad / ((RAY_COUNT as f32) - 1.0).max(1.0);
     let angle = player_angle - half_fov + angle_step * (ray_index as f32);
     angle
+}
+
+pub fn get_ray_offset(ray_index: usize, view_info: &ViewInfo) -> f32 {
+    let fov_rad = view_info.fov.to_radians();
+    let half_fov = fov_rad / 2.0;
+    let angle_step = fov_rad / ((RAY_COUNT as f32) - 1.0).max(1.0);
+    // offset from center, NOT absolute world angle
+    -half_fov + angle_step * (ray_index as f32)
 }
 
 pub struct Ray {
@@ -74,4 +84,11 @@ pub fn get_hits(
     }
 }
 
-fn hit_to_screen_x(view_info: Res<ViewInfo>, hits: Res<Hits>, ray_index: usize) {}
+pub fn hit_to_screen_x(view_info: &ViewInfo, hits: &Hits, ray_index: usize) -> Option<f32> {
+    if let Some(_) = hits.0[ray_index] {
+        let angle = get_ray_offset(ray_index, &view_info);
+        Some(view_info.view_distance * angle.tan())
+    } else {
+        None
+    }
+}

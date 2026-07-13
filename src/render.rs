@@ -6,34 +6,16 @@ use ray::*;
 pub fn render(
     mut gizmos: Gizmos,
     player_cache: Res<PlayerCameraCache>,
-    window_query: Query<&Window, With<PrimaryWindow>>,
-    hits: Res<Hits>
+    hits: Res<Hits>,
+    view_info: Res<ViewInfo>
 ) {
-    // if let Ok((transform, view_info)) = query.single() && let Ok(window) = window_query.single() {
-    //   let origin = transform.translation.truncate();
-    //   let window_size = window.size();
-    //   for i in 0..RAY_COUNT {
-    //     let line_width = window_size.x / (RAY_COUNT as f32);
-
-    //     let iso = Isometry2d::from_xy(
-    //       line_width * ((i as f32) - (RAY_COUNT as f32) / 2.0) + line_width / 2.0,
-    //       0.0
-    //     );
-    //     let player_angle = transform.rotation.to_euler(EulerRot::XYZ).2;
-    //     let ray_angle = get_ray_angle(i, transform, view_info);
-    //     let relative_angle = ray_angle - player_angle; // offset from center of FOV
-
-    //     let mut line_height: f32 = 0.0;
-    //     if let Some(hit) = hits.0[i] {
-    //       let dist = origin.distance(hit) * relative_angle.cos();
-    //       if dist <= view_info.max_distance {
-    //         line_height = (WALL_HEIGHT * window_size.y) / dist;
-    //       }
-    //     }
-    //     gizmos.rect_2d(iso, Vec2::new(line_width, line_height), Color::srgb(1.0, 0.0, 0.0));
-    //     //MAKE RENDER LINES
-    //   }
-    // }
+    for i in 0..RAY_COUNT {
+        if let Some(hit) = hits.0[i] {
+            let hitx = hit_to_screen_x(&view_info, &hits, i);
+            println!("{:?}", hitx);
+            gizmos.circle_2d(Isometry2d::from_xy(hitx.unwrap_or(0.0), 0.0), 10.0, Color::WHITE);
+        }
+    }
     // if let Ok((transform, view_info)) = query.single() && let Ok(window) = window_query.single() {
     // THROW OUT WALLS WITH Y < 0 -> Get relative coords
     // FIGURE OUT CLIPPING??

@@ -49,14 +49,7 @@ fn main() {
         .add_systems(Update, ray::get_hits)
         .add_systems(Update, render)
         .insert_resource(Map {
-            walls: vec![
-                Wall::new(-100.0, -100.0, 100.0, 100.0),
-                Wall::new(-100.0, 50.0, 100.0, 50.0),
-                Wall::new(-200.0, -200.0, -200.0, 200.0),
-                Wall::new(-200.0, 200.0, 200.0, 200.0),
-                Wall::new(-200.0, -200.0, 200.0, -200.0),
-                Wall::new(200.0, 200.0, 200.0, -200.0)
-            ],
+            walls: vec![Wall::new(-100.0, 100.0, 0.0, 0.0)],
         })
         .insert_resource(ViewInfo::default())
         .insert_resource(Hits::default())
@@ -81,7 +74,7 @@ impl Default for ViewInfo {
     fn default() -> Self {
         let fov: f32 = 90.0;
         //Calculate the distance from the camera to the screen
-        let view_distance = (WINDOW_WIDTH as f32) / 2.0 / (fov / 2.0).tan();
+        let view_distance = (WINDOW_WIDTH as f32) / 2.0 / (fov.to_radians() / 2.0).tan();
         ViewInfo { fov, max_distance: 500.0, view_distance }
     }
 }

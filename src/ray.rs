@@ -84,11 +84,11 @@ pub fn get_hits(
     }
 }
 
-pub fn hit_to_screen_x(view_info: &ViewInfo, hits: &Hits, ray_index: usize) -> Option<f32> {
-    if let Some(_) = hits.0[ray_index] {
-        let angle = get_ray_offset(ray_index, &view_info);
-        Some(view_info.view_distance * angle.tan())
-    } else {
-        None
-    }
+pub fn hit_to_screen_x(view_info: &ViewInfo, hits: &Hits, ray_index: usize) -> f32 {
+    let angle = get_ray_offset(ray_index, &view_info);
+    view_info.view_distance * angle.tan()
+}
+
+pub fn perpendicular_distance(ray_hit_distance: f32, ray_offset: f32) -> f32 {
+    ray_hit_distance * ray_offset.cos()
 }

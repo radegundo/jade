@@ -68,6 +68,7 @@ pub struct ViewInfo {
     pub max_distance: f32,
     //Distance which the screen sits from the players point of view
     pub view_distance: f32,
+    pub eye_height: f32,
 }
 
 impl Default for ViewInfo {
@@ -75,7 +76,8 @@ impl Default for ViewInfo {
         let fov: f32 = 90.0;
         //Calculate the distance from the camera to the screen
         let view_distance = (WINDOW_WIDTH as f32) / 2.0 / (fov.to_radians() / 2.0).tan();
-        ViewInfo { fov, max_distance: 500.0, view_distance }
+        let eye_height = 1.8;
+        ViewInfo { fov, max_distance: 500.0, view_distance, eye_height }
     }
 }
 

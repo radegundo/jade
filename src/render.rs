@@ -11,9 +11,22 @@ pub fn render(
 ) {
     for i in 0..RAY_COUNT {
         if let Some(hit) = hits.0[i] {
-            let hitx = hit_to_screen_x(&view_info, &hits, i);
-            println!("{:?}", hitx);
-            gizmos.circle_2d(Isometry2d::from_xy(hitx.unwrap_or(0.0), 0.0), 10.0, Color::WHITE);
+            let x = hit_to_screen_x(&view_info, &hits, i);
+            let transform = player_cache.transform;
+            let wall_bottom = 0.0;
+            let wall_top = wall_bottom + WALL_HEIGHT;
+            let top_relative = wall_top - view_info.eye_height;
+            let bottom_relative = wall_bottom - view_info.eye_height;
+
+            let perp_distance = perpendicular_distance(
+                transform.translation.truncate().distance(hit),
+                get_ray_offset(i, &view_info)
+            );
+
+            let top_screen = (top_relative * view_info.view_distance) / perp_distance;
+            let bottom_screen = (bottom_relative * view_info.view_distance) / perp_distance;
+
+            gizmos.line_2d(Vec2::new(x, top_screen), Vec2::new(x, bottom_screen), Color::WHITE);
         }
     }
     // if let Ok((transform, view_info)) = query.single() && let Ok(window) = window_query.single() {

@@ -18,9 +18,13 @@ mod map;
 mod render;
 
 //Screen width
-const RAY_COUNT: usize = 1920;
+//For naming purposes duplicate the constant
+const WINDOW_WIDTH: usize = 1920;
 const WINDOW_HEIGHT: u32 = 1080;
+
 const WALL_HEIGHT: f32 = 20.0;
+
+const RAY_COUNT: usize = WINDOW_WIDTH;
 
 fn main() {
     App::new()
@@ -28,7 +32,7 @@ fn main() {
             DefaultPlugins.set(WindowPlugin {
                 primary_window: Some(Window {
                     title: "My Bevy App".to_string(),
-                    resolution: WindowResolution::new(RAY_COUNT as u32, WINDOW_HEIGHT),
+                    resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT),
                     resizable: false,
                     ..default()
                 }),
@@ -38,6 +42,7 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(Startup, setup_gizmo_layers)
         .add_plugins(OwnInputPlugin)
+        .add_systems(Update, sync_player_camera)
         .add_plugins(AbsoluteMapPlugin)
         .add_plugins(RelativeMapPlugin)
         .init_state::<MapViewMode>()
@@ -53,12 +58,9 @@ fn main() {
                 Wall::new(200.0, 200.0, 200.0, -200.0)
             ],
         })
-        .insert_resource(ViewInfo {
-            angle: 70.0,
-            max_distance: 500.0,
-            view_distance: 50.0,
-        })
+        .insert_resource(ViewInfo::default())
         .insert_resource(Hits::default())
+        .insert_resource(PlayerCameraCache::default())
         .init_gizmo_group::<MapGizmos>()
         .run();
 }
@@ -69,10 +71,19 @@ struct Player;
 
 #[derive(Resource)]
 pub struct ViewInfo {
-    pub angle: f32,
+    pub fov: f32,
     pub max_distance: f32,
     //Distance which the screen sits from the players point of view
     pub view_distance: f32,
+}
+
+impl Default for ViewInfo {
+    fn default() -> Self {
+        let fov: f32 = 90.0;
+        //Calculate the distance from the camera to the screen
+        let view_distance = (WINDOW_WIDTH as f32) / 2.0 / (fov / 2.0).tan();
+        ViewInfo { fov, max_distance: 500.0, view_distance }
+    }
 }
 
 #[derive(Resource)]
@@ -82,6 +93,12 @@ impl Default for Hits {
     fn default() -> Self {
         Hits([None; RAY_COUNT])
     }
+}
+
+//Resource that syncs the player position to a resource
+#[derive(Resource, Default)]
+pub struct PlayerCameraCache {
+    transform: Transform,
 }
 
 fn setup(
@@ -123,4 +140,14 @@ pub struct MapGizmos;
 fn setup_gizmo_layers(mut config_store: ResMut<GizmoConfigStore>) {
     let (config, _) = config_store.config_mut::<MapGizmos>();
     config.render_layers = RenderLayers::layer(1);
+}
+
+//Sync the players position and angle to a resource
+fn sync_player_camera(
+    query: Query<&Transform, With<Player>>,
+    mut cache: ResMut<PlayerCameraCache>
+) {
+    if let Ok(transform) = query.single() {
+        cache.transform = *transform;
+    }
 }

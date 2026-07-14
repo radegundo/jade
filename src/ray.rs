@@ -66,54 +66,55 @@ fn ray_hit(ray: &Ray, wall: &LineDef) -> Option<Vec2> {
     return None;
 }
 
-pub fn get_hits(
-    player_cache: Res<PlayerCameraCache>,
-    mut hits: ResMut<Hits>,
-    map: Res<Map2>,
-    view_info: Res<ViewInfo>
-) {
-    let transform = player_cache.transform;
-    let origin = transform.translation.truncate();
-    let view_info = view_info.into_inner();
-    for i in 0..RAY_COUNT {
-        // Get each ray's angle based on the player's rotation and the field of view
-        let angle = get_ray_angle(i, &transform, view_info);
-        let offset = get_ray_offset(i, view_info); // needed for fisheye correction
-        let start = transform.translation;
-        let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * view_info.max_distance;
-        let ray = Ray { start: start.truncate(), sec_point: end.truncate() };
+//Keeping this for now but probably wont need it again
+// pub fn get_hits(
+//     player_cache: Res<PlayerCameraCache>,
+//     mut hits: ResMut<Hits>,
+//     map: Res<Map>,
+//     view_info: Res<ViewInfo>
+// ) {
+//     let transform = player_cache.transform;
+//     let origin = transform.translation.truncate();
+//     let view_info = view_info.into_inner();
+//     for i in 0..RAY_COUNT {
+//         // Get each ray's angle based on the player's rotation and the field of view
+//         let angle = get_ray_angle(i, &transform, view_info);
+//         let offset = get_ray_offset(i, view_info); // needed for fisheye correction
+//         let start = transform.translation;
+//         let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * view_info.max_distance;
+//         let ray = Ray { start: start.truncate(), sec_point: end.truncate() };
 
-        let mut nearest_hit: Option<(Vec2, Color)> = None;
-        let mut nearest_dist_sq = f32::MAX;
+//         let mut nearest_hit: Option<(Vec2, Color)> = None;
+//         let mut nearest_dist_sq = f32::MAX;
 
-        for sector in &map.sectors {
-            for wall in &sector.walls {
-                if let Some(hit) = ray_hit(&ray, wall) {
-                    let dist_sq = origin.distance_squared(hit);
-                    if dist_sq < nearest_dist_sq {
-                        nearest_dist_sq = dist_sq;
-                        nearest_hit = Some((
-                            hit,
-                            wall.front_side_def.middle_texture.unwrap_or_default(),
-                        ));
-                    }
-                }
-            }
-        }
-        if let Some(hit) = nearest_hit {
-            let raw_dist = nearest_dist_sq.sqrt(); // straight-line distance
-            let perp_dist = raw_dist * offset.cos(); // fisheye-corrected
-            hits.hits[i] = Some(WallHit {
-                pos: hit.0,
-                perp_dist: perp_dist,
-                color: Some(hit.1),
-                ..default()
-            });
-        } else {
-            hits.hits[i] = None;
-        }
-    }
-}
+//         for sector in &map.sectors {
+//             for wall in &sector.walls {
+//                 if let Some(hit) = ray_hit(&ray, wall) {
+//                     let dist_sq = origin.distance_squared(hit);
+//                     if dist_sq < nearest_dist_sq {
+//                         nearest_dist_sq = dist_sq;
+//                         nearest_hit = Some((
+//                             hit,
+//                             wall.front_side_def.middle_texture.unwrap_or_default(),
+//                         ));
+//                     }
+//                 }
+//             }
+//         }
+//         if let Some(hit) = nearest_hit {
+//             let raw_dist = nearest_dist_sq.sqrt(); // straight-line distance
+//             let perp_dist = raw_dist * offset.cos(); // fisheye-corrected
+//             hits.hits[i] = Some(WallHit {
+//                 pos: hit.0,
+//                 perp_dist: perp_dist,
+//                 color: Some(hit.1),
+//                 ..default()
+//             });
+//         } else {
+//             hits.hits[i] = None;
+//         }
+//     }
+// }
 
 pub fn get_sector_hits(
     player_cache: &PlayerCameraCache,
@@ -166,6 +167,7 @@ pub fn hit_to_screen_x(view_info: &ViewInfo, ray_index: usize) -> f32 {
     view_info.view_distance * angle.tan()
 }
 
-pub fn perpendicular_distance(ray_hit_distance: f32, ray_offset: f32) -> f32 {
-    ray_hit_distance * ray_offset.cos()
-}
+//Probably wont need this anymore
+// pub fn perpendicular_distance(ray_hit_distance: f32, ray_offset: f32) -> f32 {
+//     ray_hit_distance * ray_offset.cos()
+// }

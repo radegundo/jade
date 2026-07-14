@@ -15,7 +15,7 @@ impl Plugin for RelativeMapPlugin {
 }
 
 pub fn draw_walls(
-    map: Res<Map2>,
+    map: Res<Map>,
     mut gizmos: Gizmos<MapGizmos>,
     player_cache: Res<PlayerCameraCache>
 ) {

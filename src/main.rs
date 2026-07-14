@@ -49,9 +49,6 @@ fn main() {
         // .add_systems(Update, ray::get_hits)
         .add_systems(Update, render)
         .insert_resource(Map {
-            walls: vec![LineDef::new(-100.0, 100.0, 0.0, 0.0, Color::srgb(1.0, 0.0, 0.0))],
-        })
-        .insert_resource(Map2 {
             sectors: vec![
                 Sector {
                     walls: vec![LineDef::new(-100.0, 0.0, 100.0, 0.0, Color::srgb(1.0, 0.0, 0.0))],

@@ -16,7 +16,7 @@ impl Plugin for AbsoluteMapPlugin {
     }
 }
 
-pub fn draw_walls(map: Res<Map2>, mut gizmos: Gizmos<MapGizmos>) {
+pub fn draw_walls(map: Res<Map>, mut gizmos: Gizmos<MapGizmos>) {
     for sector in &map.sectors {
         for wall in &sector.walls {
             gizmos.line(

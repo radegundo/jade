@@ -9,13 +9,8 @@ pub struct Sector {
 }
 
 #[derive(Resource)]
-pub struct Map2 {
-    pub sectors: Vec<Sector>,
-}
-
-#[derive(Resource)]
 pub struct Map {
-    pub walls: Vec<LineDef>,
+    pub sectors: Vec<Sector>,
 }
 
 #[derive(Default)]

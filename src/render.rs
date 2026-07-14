@@ -8,7 +8,7 @@ pub fn render(
     mut hits: ResMut<Hits>,
     view_info: Res<ViewInfo>,
     player_cache: Res<PlayerCameraCache>,
-    map: Res<Map2>
+    map: Res<Map>
 ) {
     get_sector_hits(&player_cache, &mut hits, &map.sectors[1], &view_info);
     for i in 0..RAY_COUNT {

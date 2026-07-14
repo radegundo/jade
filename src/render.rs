@@ -10,6 +10,7 @@ pub fn render(
     player_cache: Res<PlayerCameraCache>,
     map: Res<Map>
 ) {
+    //Even odd rule to determine which secto I am in
     get_sector_hits(&player_cache, &mut hits, &map.sectors[2], &view_info);
     for i in 0..RAY_COUNT {
         if let Some(hit) = &hits.hits[i] {

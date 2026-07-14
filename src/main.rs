@@ -8,6 +8,7 @@ use bevy_grid::*;
 use crate::{
     input::OwnInputPlugin,
     map::{ absolute_map::AbsoluteMapPlugin, relative_map::RelativeMapPlugin, * },
+    ray::Hits,
 };
 use render::*;
 
@@ -21,7 +22,7 @@ mod render;
 const WINDOW_WIDTH: usize = 1920;
 const WINDOW_HEIGHT: u32 = 1080;
 
-const WALL_HEIGHT: f32 = 20.0;
+const WALL_HEIGHT: f32 = 3.0;
 
 const RAY_COUNT: usize = WINDOW_WIDTH;
 
@@ -80,15 +81,6 @@ impl Default for ViewInfo {
         let view_distance = (WINDOW_WIDTH as f32) / 2.0 / (fov.to_radians() / 2.0).tan();
         let eye_height = 1.8;
         ViewInfo { fov, max_distance: 500.0, view_distance, eye_height }
-    }
-}
-
-#[derive(Resource)]
-struct Hits([Option<Vec2>; RAY_COUNT]);
-
-impl Default for Hits {
-    fn default() -> Self {
-        Hits([None; RAY_COUNT])
     }
 }
 

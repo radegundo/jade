@@ -3,28 +3,17 @@ use bevy::prelude::*;
 use crate::*;
 use ray::*;
 
-pub fn render(
-    mut gizmos: Gizmos,
-    player_cache: Res<PlayerCameraCache>,
-    hits: Res<Hits>,
-    view_info: Res<ViewInfo>
-) {
+pub fn render(mut gizmos: Gizmos, hits: Res<Hits>, view_info: Res<ViewInfo>) {
     for i in 0..RAY_COUNT {
-        if let Some(hit) = hits.0[i] {
+        if let Some(hit) = &hits.hits[i] {
             let x = hit_to_screen_x(&view_info, i);
-            let transform = player_cache.transform;
             let wall_bottom = 0.0;
             let wall_top = wall_bottom + WALL_HEIGHT;
             let top_relative = wall_top - view_info.eye_height;
             let bottom_relative = wall_bottom - view_info.eye_height;
 
-            let perp_distance = perpendicular_distance(
-                transform.translation.truncate().distance(hit),
-                get_ray_offset(i, &view_info)
-            );
-
-            let top_screen = (top_relative * view_info.view_distance) / perp_distance;
-            let bottom_screen = (bottom_relative * view_info.view_distance) / perp_distance;
+            let top_screen = (top_relative * view_info.view_distance) / hit.perp_dist;
+            let bottom_screen = (bottom_relative * view_info.view_distance) / hit.perp_dist;
 
             gizmos.line_2d(Vec2::new(x, top_screen), Vec2::new(x, bottom_screen), Color::WHITE);
         }

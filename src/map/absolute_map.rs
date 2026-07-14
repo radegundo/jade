@@ -38,7 +38,10 @@ pub fn draw_rays(
         let start = transform.translation;
         let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * view_info.max_distance;
 
-        let draw_end = hits.0[i].unwrap_or(end.truncate());
+        let draw_end = hits.hits[i]
+            .as_ref()
+            .map(|hit| hit.pos)
+            .unwrap_or_else(|| end.truncate());
 
         // Draw to the nearest hit, or the full ray length if nothing was hit
         gizmos.line(start, draw_end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));

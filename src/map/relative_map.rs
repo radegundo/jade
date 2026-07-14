@@ -50,7 +50,10 @@ pub fn draw_rays(
         //Not needed but kept for readability
         // let end_rel = get_relative_coords(transform, end.truncate()).extend(0.0);
 
-        let draw_end = get_relative_coords(transform, hits.0[i].unwrap_or(end.truncate()));
+        let draw_end = hits.hits[i]
+            .as_ref()
+            .map(|hit| get_relative_coords(transform, hit.pos))
+            .unwrap_or_else(|| get_relative_coords(transform, end.truncate()));
 
         // Draw to the nearest hit, or the full ray length if nothing was hit
         gizmos.line(start_rel, draw_end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));

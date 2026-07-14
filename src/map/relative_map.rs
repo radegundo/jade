@@ -24,7 +24,11 @@ pub fn draw_walls(
             let transform = &player_cache.transform;
             let start: Vec2 = get_relative_coords(transform, wall.start);
             let end: Vec2 = get_relative_coords(transform, wall.end);
-            gizmos.line(start.extend(0.0), end.extend(0.0), Color::srgb(1.0, 0.0, 0.0));
+            gizmos.line(
+                start.extend(0.0),
+                end.extend(0.0),
+                wall.front_side_def.middle_texture.unwrap_or_default()
+            );
         }
     }
 }

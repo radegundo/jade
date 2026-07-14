@@ -3,7 +3,14 @@ use bevy::prelude::*;
 use crate::*;
 use ray::*;
 
-pub fn render(mut gizmos: Gizmos, hits: Res<Hits>, view_info: Res<ViewInfo>) {
+pub fn render(
+    mut gizmos: Gizmos,
+    mut hits: ResMut<Hits>,
+    view_info: Res<ViewInfo>,
+    player_cache: Res<PlayerCameraCache>,
+    map: Res<Map2>
+) {
+    get_sector_hits(&player_cache, &mut hits, &map.sectors[1], &view_info);
     for i in 0..RAY_COUNT {
         if let Some(hit) = &hits.hits[i] {
             let x = hit_to_screen_x(&view_info, i);

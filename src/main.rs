@@ -46,18 +46,22 @@ fn main() {
         .add_plugins(AbsoluteMapPlugin)
         .add_plugins(RelativeMapPlugin)
         .init_state::<MapViewMode>()
-        .add_systems(Update, ray::get_hits)
+        // .add_systems(Update, ray::get_hits)
         .add_systems(Update, render)
         .insert_resource(Map {
             walls: vec![LineDef::new(-100.0, 100.0, 0.0, 0.0, Color::srgb(1.0, 0.0, 0.0))],
         })
         .insert_resource(Map2 {
-            sectors: vec![Sector {
-                walls: vec![
-                    LineDef::new(-100.0, 0.0, 100.0, 0.0, Color::srgb(1.0, 0.0, 0.0)),
-                    LineDef::new(-100.0, 0.0, -100.0, -100.0, Color::srgb(0.0, 0.0, 1.0))
-                ],
-            }],
+            sectors: vec![
+                Sector {
+                    walls: vec![LineDef::new(-100.0, 0.0, 100.0, 0.0, Color::srgb(1.0, 0.0, 0.0))],
+                },
+                Sector {
+                    walls: vec![
+                        LineDef::new(-100.0, 0.0, -100.0, -100.0, Color::srgb(0.0, 0.0, 1.0))
+                    ],
+                }
+            ],
         })
         .insert_resource(ViewInfo::default())
         .insert_resource(Hits::default())

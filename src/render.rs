@@ -15,7 +15,11 @@ pub fn render(mut gizmos: Gizmos, hits: Res<Hits>, view_info: Res<ViewInfo>) {
             let top_screen = (top_relative * view_info.view_distance) / hit.perp_dist;
             let bottom_screen = (bottom_relative * view_info.view_distance) / hit.perp_dist;
 
-            gizmos.line_2d(Vec2::new(x, top_screen), Vec2::new(x, bottom_screen), Color::WHITE);
+            gizmos.line_2d(
+                Vec2::new(x, top_screen),
+                Vec2::new(x, bottom_screen),
+                hit.color.unwrap_or_default()
+            );
         }
     }
     // if let Ok((transform, view_info)) = query.single() && let Ok(window) = window_query.single() {

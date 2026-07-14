@@ -28,9 +28,9 @@ pub struct LineDef {
 
 #[derive(Default)]
 pub struct SideDef {
-    upper_texture: Option<Color>,
-    middle_texture: Option<Color>,
-    lower_texture: Option<Color>,
+    pub upper_texture: Option<Color>,
+    pub middle_texture: Option<Color>,
+    pub lower_texture: Option<Color>,
 }
 
 #[derive(Resource)]
@@ -49,7 +49,8 @@ pub enum MapViewMode {
 }
 
 impl LineDef {
-    pub fn new(x0: f32, y0: f32, x1: f32, y1: f32) -> Self {
-        LineDef { start: Vec2::new(x0, y0), end: Vec2::new(x1, y1), ..default() }
+    pub fn new(x0: f32, y0: f32, x1: f32, y1: f32, color: Color) -> Self {
+        let front_side_def = SideDef { middle_texture: Some(color), ..default() };
+        LineDef { start: Vec2::new(x0, y0), end: Vec2::new(x1, y1), front_side_def, ..default() }
     }
 }

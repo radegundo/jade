@@ -57,6 +57,12 @@ fn main() {
                     walls: vec![
                         LineDef::new(-100.0, 0.0, -100.0, -100.0, Color::srgb(0.0, 0.0, 1.0))
                     ],
+                },
+                Sector {
+                    walls: vec![
+                        LineDef::new(0.0, 0.0, -100.0, 100.0, Color::srgb(0.0, 0.0, 1.0)),
+                        LineDef::new(0.0, 0.0, 100.0, 100.0, Color::srgb(0.0, 1.0, 1.0))
+                    ],
                 }
             ],
         })

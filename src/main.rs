@@ -49,22 +49,14 @@ fn main() {
         // .add_systems(Update, ray::get_hits)
         .add_systems(Update, render)
         .insert_resource(Map {
-            sectors: vec![
-                Sector {
-                    walls: vec![LineDef::new(-100.0, 0.0, 100.0, 0.0, Color::srgb(1.0, 0.0, 0.0))],
-                },
-                Sector {
-                    walls: vec![
-                        LineDef::new(-100.0, 0.0, -100.0, -100.0, Color::srgb(0.0, 0.0, 1.0))
-                    ],
-                },
-                Sector {
-                    walls: vec![
-                        LineDef::new(0.0, 0.0, -100.0, 100.0, Color::srgb(0.0, 0.0, 1.0)),
-                        LineDef::new(0.0, 0.0, 100.0, 100.0, Color::srgb(0.0, 1.0, 1.0))
-                    ],
-                }
-            ],
+            sectors: vec![Sector {
+                walls: vec![
+                    LineDef::new(0.0, 0.0, -100.0, 100.0, Color::srgb(0.0, 0.0, 1.0)),
+                    LineDef::new(-100.0, 100.0, 0.0, 200.0, Color::srgb(1.0, 0.5, 0.0)),
+                    LineDef::new(0.0, 200.0, 100.0, 100.0, Color::srgb(1.0, 0.5, 0.0)),
+                    LineDef::new(0.0, 0.0, 100.0, 100.0, Color::srgb(0.0, 1.0, 1.0))
+                ],
+            }],
         })
         .insert_resource(ViewInfo::default())
         .insert_resource(Hits::default())

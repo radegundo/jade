@@ -10,7 +10,16 @@ pub fn render(
     player_cache: Res<PlayerCameraCache>,
     map: Res<Map>
 ) {
-    get_sector_hits(&player_cache, &mut hits, &map.sectors[2], &view_info);
+    let player_pos = player_cache.transform.translation.truncate();
+    if let Some(i) = find_player_sector(player_pos, &map) {
+        println!("IN SECTOR: {i}");
+        get_sector_hits(&player_cache, &mut hits, &map.sectors[i], &view_info);
+    } else {
+        println!("IN NO SECTOR");
+        for hit in hits.hits.iter_mut() {
+            *hit = None;
+        }
+    }
     for i in 0..RAY_COUNT {
         if let Some(hit) = &hits.hits[i] {
             let x = hit_to_screen_x(&view_info, i);

@@ -3,6 +3,8 @@ pub mod relative_map;
 
 use bevy::prelude::*;
 
+use crate::PlayerCameraCache;
+
 #[derive(Resource)]
 pub struct Sector {
     pub walls: Vec<LineDef>,
@@ -48,4 +50,31 @@ impl LineDef {
         let front_side_def = SideDef { middle_texture: Some(color), ..default() };
         LineDef { start: Vec2::new(x0, y0), end: Vec2::new(x1, y1), front_side_def, ..default() }
     }
+}
+
+pub fn point_in_sector(point: Vec2, sector: &Sector) -> bool {
+    let mut inside = false;
+    for wall in &sector.walls {
+        let (x1, y1) = (wall.start.x, wall.start.y);
+        let (x2, y2) = (wall.end.x, wall.end.y);
+
+        let crosses = (y1 > point.y) != (y2 > point.y);
+
+        if crosses {
+            let x_intersect = x1 + ((point.y - y1) / (y2 - y1)) * (x2 - x1);
+            if point.x < x_intersect {
+                inside = !inside;
+            }
+        }
+    }
+    inside
+}
+
+pub fn find_player_sector(player_pos: Vec2, map: &Map) -> Option<usize> {
+    for (i, sector) in map.sectors.iter().enumerate() {
+        if point_in_sector(player_pos, sector) {
+            return Some(i);
+        }
+    }
+    None
 }

@@ -12,10 +12,8 @@ pub fn render(
 ) {
     let player_pos = player_cache.transform.translation.truncate();
     if let Some(i) = find_player_sector(player_pos, &map) {
-        println!("IN SECTOR: {i}");
-        get_sector_hits(&player_cache, &mut hits, &map.sectors[i], &view_info);
+        get_sector_hits(&player_cache, &mut hits, &map.sectors[i], i, &view_info);
     } else {
-        println!("IN NO SECTOR");
         for hit in hits.hits.iter_mut() {
             *hit = None;
         }
@@ -24,8 +22,8 @@ pub fn render(
         if let Some(hit) = &hits.hits[i] {
             if hit.line_def.back_side_def.is_none() {
                 let x = hit_to_screen_x(&view_info, i);
-                let wall_bottom = 0.0;
-                let wall_top = wall_bottom + WALL_HEIGHT;
+                let wall_bottom = map.sectors[hit.sector_id].floor_height;
+                let wall_top = map.sectors[hit.sector_id].ceiling_height;
                 let top_relative = wall_top - view_info.eye_height;
                 let bottom_relative = wall_bottom - view_info.eye_height;
 
@@ -44,7 +42,9 @@ pub fn render(
                     hit.pos,
                     hit.perp_dist,
                     &map.sectors[hit.line_def.back_side_def.clone().unwrap().sector],
+                    hit.line_def.back_side_def.clone().unwrap().sector,
                     &view_info,
+
                     &mut gizmos,
                     &map
                 );
@@ -59,6 +59,7 @@ pub fn render_portal(
     entry_pos: Vec2,
     entry_dist: f32,
     sector: &Sector,
+    sector_idx: usize,
     view_info: &ViewInfo,
     gizmos: &mut Gizmos,
     map: &Map
@@ -70,15 +71,15 @@ pub fn render_portal(
     let mut nudged_transform = player_cache.transform.clone();
     nudged_transform.translation = nudged_origin.extend(0.0);
 
-    if let Some(hit) = get_single_hit(&nudged_transform, view_info, sector, index) {
+    if let Some(hit) = get_single_hit(&nudged_transform, view_info, sector, sector_idx, index) {
         let total_dist = entry_dist + hit.perp_dist;
 
         match &hit.line_def.back_side_def {
             None => {
-                // solid wall — draw it
+                // solid wall —> draw it
                 let x = hit_to_screen_x(view_info, index);
-                let wall_bottom = 0.0;
-                let wall_top = wall_bottom + WALL_HEIGHT;
+                let wall_bottom = map.sectors[hit.sector_id].floor_height;
+                let wall_top = map.sectors[hit.sector_id].ceiling_height;
                 let top_relative = wall_top - view_info.eye_height;
                 let bottom_relative = wall_bottom - view_info.eye_height;
                 let top_screen = (top_relative * view_info.view_distance) / total_dist;
@@ -90,16 +91,26 @@ pub fn render_portal(
                 );
             }
             Some(back) => {
-                // another portal — keep going
+                // another portal —> keep going
                 render_portal(
                     index,
                     player_cache,
                     hit.pos,
                     total_dist,
                     &map.sectors[back.sector],
+                    back.sector,
                     view_info,
                     gizmos,
                     map
+                );
+                render_portal_boundary(
+                    index,
+                    &map.sectors[hit.line_def.front_side_def.sector],
+                    &map.sectors[back.sector],
+                    &hit.line_def,
+                    total_dist,
+                    view_info,
+                    gizmos
                 );
             }
         }
@@ -114,4 +125,57 @@ pub fn get_relative_coords(transform: &Transform, coords: Vec2) -> Vec2 {
     let rel_y = -dx * angle.sin() + dy * angle.cos();
 
     Vec2::new(rel_x, rel_y)
+}
+pub fn update_eye_height(
+    player_cache: Res<PlayerCameraCache>,
+    map: Res<Map>,
+    mut view_info: ResMut<ViewInfo>,
+    time: Res<Time>
+) {
+    let pos = player_cache.transform.translation.truncate();
+
+    if let Some(sector_idx) = find_player_sector(pos, &map) {
+        let sector = &map.sectors[sector_idx];
+        let target_eye_height = sector.floor_height + EYE_OFFSET;
+
+        let speed = 8.0; // higher = snappier transition
+        view_info.eye_height =
+            view_info.eye_height +
+            (target_eye_height - view_info.eye_height) * (speed * time.delta_secs()).min(1.0);
+    }
+}
+
+pub fn render_portal_boundary(
+    index: usize,
+    front_sector: &Sector, // sector the ray is leaving
+    back_sector: &Sector, // sector the ray is entering
+    line_def: &LineDef,
+    total_dist: f32,
+    view_info: &ViewInfo,
+    gizmos: &mut Gizmos
+) {
+    let x = hit_to_screen_x(view_info, index);
+
+    // Upper segment: draw if the new sector's ceiling is LOWER than the current one
+    if back_sector.ceiling_height < front_sector.ceiling_height {
+        if let Some(color) = &line_def.front_side_def.upper_texture {
+            let top = project_height(front_sector.ceiling_height, total_dist, view_info);
+            let bottom = project_height(back_sector.ceiling_height, total_dist, view_info);
+            gizmos.line_2d(Vec2::new(x, top), Vec2::new(x, bottom), *color);
+        }
+    }
+
+    // Lower segment: draw if the new sector's floor is HIGHER than the current one
+    if back_sector.floor_height > front_sector.floor_height {
+        if let Some(color) = &line_def.front_side_def.lower_texture {
+            let top = project_height(back_sector.floor_height, total_dist, view_info);
+            let bottom = project_height(front_sector.floor_height, total_dist, view_info);
+            gizmos.line_2d(Vec2::new(x, top), Vec2::new(x, bottom), *color);
+        }
+    }
+}
+
+fn project_height(world_height: f32, dist: f32, view_info: &ViewInfo) -> f32 {
+    let relative = world_height - view_info.eye_height;
+    (relative * view_info.view_distance) / dist
 }

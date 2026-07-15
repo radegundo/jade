@@ -22,7 +22,7 @@ mod render;
 const WINDOW_WIDTH: usize = 1920;
 const WINDOW_HEIGHT: u32 = 1080;
 
-const WALL_HEIGHT: f32 = 3.0;
+const EYE_OFFSET: f32 = 1.6;
 
 const RAY_COUNT: usize = WINDOW_WIDTH;
 
@@ -39,20 +39,26 @@ fn main() {
                 ..default()
             })
         )
+        //SETUP
         .add_systems(Startup, setup)
         .add_systems(Startup, setup_gizmo_layers)
+        //INPUT
         .add_plugins(OwnInputPlugin)
+        //UPDATE CAMERA
         .add_systems(Update, sync_player_camera)
+        .add_systems(Update, update_eye_height)
+        //MAP
         .add_plugins(AbsoluteMapPlugin)
         .add_plugins(RelativeMapPlugin)
         .init_state::<MapViewMode>()
-        // .add_systems(Update, ray::get_hits)
+        .init_gizmo_group::<MapGizmos>()
+        //RENDER
         .add_systems(Update, render)
+        //RESOURCES
         .insert_resource(test_map())
         .insert_resource(ViewInfo::default())
         .insert_resource(Hits::default())
         .insert_resource(PlayerCameraCache::default())
-        .init_gizmo_group::<MapGizmos>()
         .run();
 }
 
@@ -155,6 +161,8 @@ pub fn test_map() -> Map {
                     // west wall - solid
                     LineDef::new(0.0, 100.0, 0.0, 0.0, Color::srgb(1.0, 1.0, 0.0))
                 ],
+                ceiling_height: 50.0,
+                floor_height: 5.0,
             },
             // Sector 1: narrow corridor (100,40) to (150,60)
             Sector {
@@ -171,6 +179,8 @@ pub fn test_map() -> Map {
                     // west side - portal back to sector 0
                     portal(100.0, 60.0, 100.0, 40.0, 0)
                 ],
+                ceiling_height: 50.0,
+                floor_height: 20.0,
             },
             // Sector 2: second room (150,0) to (250,100)
             Sector {
@@ -193,6 +203,8 @@ pub fn test_map() -> Map {
                     // west wall lower segment - solid
                     LineDef::new(150.0, 40.0, 150.0, 0.0, Color::srgb(1.0, 1.0, 0.0))
                 ],
+                ceiling_height: 50.0,
+                floor_height: 10.0,
             }
         ],
     }

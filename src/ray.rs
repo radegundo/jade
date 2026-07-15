@@ -66,96 +66,53 @@ fn ray_hit(ray: &Ray, wall: &LineDef) -> Option<Vec2> {
     return None;
 }
 
-//Keeping this for now but probably wont need it again
-// pub fn get_hits(
-//     player_cache: Res<PlayerCameraCache>,
-//     mut hits: ResMut<Hits>,
-//     map: Res<Map>,
-//     view_info: Res<ViewInfo>
-// ) {
-//     let transform = player_cache.transform;
-//     let origin = transform.translation.truncate();
-//     let view_info = view_info.into_inner();
-//     for i in 0..RAY_COUNT {
-//         // Get each ray's angle based on the player's rotation and the field of view
-//         let angle = get_ray_angle(i, &transform, view_info);
-//         let offset = get_ray_offset(i, view_info); // needed for fisheye correction
-//         let start = transform.translation;
-//         let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * view_info.max_distance;
-//         let ray = Ray { start: start.truncate(), sec_point: end.truncate() };
-
-//         let mut nearest_hit: Option<(Vec2, Color)> = None;
-//         let mut nearest_dist_sq = f32::MAX;
-
-//         for sector in &map.sectors {
-//             for wall in &sector.walls {
-//                 if let Some(hit) = ray_hit(&ray, wall) {
-//                     let dist_sq = origin.distance_squared(hit);
-//                     if dist_sq < nearest_dist_sq {
-//                         nearest_dist_sq = dist_sq;
-//                         nearest_hit = Some((
-//                             hit,
-//                             wall.front_side_def.middle_texture.unwrap_or_default(),
-//                         ));
-//                     }
-//                 }
-//             }
-//         }
-//         if let Some(hit) = nearest_hit {
-//             let raw_dist = nearest_dist_sq.sqrt(); // straight-line distance
-//             let perp_dist = raw_dist * offset.cos(); // fisheye-corrected
-//             hits.hits[i] = Some(WallHit {
-//                 pos: hit.0,
-//                 perp_dist: perp_dist,
-//                 color: Some(hit.1),
-//                 ..default()
-//             });
-//         } else {
-//             hits.hits[i] = None;
-//         }
-//     }
-// }
-
 pub fn get_sector_hits(
     player_cache: &PlayerCameraCache,
     hits: &mut Hits,
     sector: &Sector,
     view_info: &ViewInfo
 ) {
-    let transform = player_cache.transform;
-    let origin = transform.translation.truncate();
     for i in 0..RAY_COUNT {
-        // Get each ray's angle based on the player's rotation and the field of view
-        let angle = get_ray_angle(i, &transform, view_info);
-        let offset = get_ray_offset(i, view_info); // needed for fisheye correction
-        let start = transform.translation;
-        let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * view_info.max_distance;
-        let ray = Ray { start: start.truncate(), sec_point: end.truncate() };
+        hits.hits[i] = get_single_hit(&player_cache.transform, view_info, sector, i);
+    }
+}
 
-        let mut nearest_hit: Option<(Vec2, LineDef)> = None;
-        let mut nearest_dist_sq = f32::MAX;
+pub fn get_single_hit(
+    transform: &Transform,
+    view_info: &ViewInfo,
+    sector: &Sector,
+    index: usize
+) -> Option<WallHit> {
+    let origin = transform.translation.truncate();
+    let angle = get_ray_angle(index, &transform, view_info);
+    let offset = get_ray_offset(index, view_info); // needed for fisheye correction
+    let start = transform.translation;
+    let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * view_info.max_distance;
+    let ray = Ray { start: start.truncate(), sec_point: end.truncate() };
 
-        for wall in &sector.walls {
-            if let Some(hit) = ray_hit(&ray, wall) {
-                let dist_sq = origin.distance_squared(hit);
-                if dist_sq < nearest_dist_sq {
-                    nearest_dist_sq = dist_sq;
-                    nearest_hit = Some((hit, wall.clone()));
-                }
+    let mut nearest_hit: Option<(Vec2, LineDef)> = None;
+    let mut nearest_dist_sq = f32::MAX;
+
+    for wall in &sector.walls {
+        if let Some(hit) = ray_hit(&ray, wall) {
+            let dist_sq = origin.distance_squared(hit);
+            if dist_sq < nearest_dist_sq {
+                nearest_dist_sq = dist_sq;
+                nearest_hit = Some((hit, wall.clone()));
             }
         }
-        if let Some(hit) = nearest_hit {
-            let raw_dist = nearest_dist_sq.sqrt(); // straight-line distance
-            let perp_dist = raw_dist * offset.cos(); // fisheye-corrected
-            hits.hits[i] = Some(WallHit {
-                pos: hit.0,
-                perp_dist: perp_dist,
-                line_def: hit.1,
-                ..default()
-            });
-        } else {
-            hits.hits[i] = None;
-        }
+    }
+    if let Some(hit) = nearest_hit {
+        let raw_dist = nearest_dist_sq.sqrt(); // straight-line distance
+        let perp_dist = raw_dist * offset.cos(); // fisheye-corrected
+        Some(WallHit {
+            pos: hit.0,
+            perp_dist: perp_dist,
+            line_def: hit.1,
+            ..default()
+        })
+    } else {
+        None
     }
 }
 

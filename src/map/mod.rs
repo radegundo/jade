@@ -3,8 +3,6 @@ pub mod relative_map;
 
 use bevy::prelude::*;
 
-use crate::PlayerCameraCache;
-
 #[derive(Resource)]
 pub struct Sector {
     pub walls: Vec<LineDef>,

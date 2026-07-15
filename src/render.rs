@@ -37,17 +37,74 @@ pub fn render(
                     Vec2::new(x, bottom_screen),
                     hit.line_def.front_side_def.middle_texture.unwrap_or_default()
                 );
+            } else {
+                render_portal(
+                    i,
+                    &player_cache,
+                    hit.pos,
+                    hit.perp_dist,
+                    &map.sectors[hit.line_def.back_side_def.clone().unwrap().sector],
+                    &view_info,
+                    &mut gizmos,
+                    &map
+                );
             }
         }
     }
-    // if let Ok((transform, view_info)) = query.single() && let Ok(window) = window_query.single() {
-    // THROW OUT WALLS WITH Y < 0 -> Get relative coords
-    // FIGURE OUT CLIPPING??
-    // GET WALL X COORDS ON SCREEN
-    // IDEK MAN
-    // }
 }
 
+pub fn render_portal(
+    index: usize,
+    player_cache: &PlayerCameraCache,
+    entry_pos: Vec2,
+    entry_dist: f32,
+    sector: &Sector,
+    view_info: &ViewInfo,
+    gizmos: &mut Gizmos,
+    map: &Map
+) {
+    let angle = get_ray_angle(index, &player_cache.transform, view_info);
+    let dir = Vec2::new(angle.cos(), angle.sin());
+    let nudged_origin = entry_pos + dir * 0.01;
+
+    let mut nudged_transform = player_cache.transform.clone();
+    nudged_transform.translation = nudged_origin.extend(0.0);
+
+    if let Some(hit) = get_single_hit(&nudged_transform, view_info, sector, index) {
+        let total_dist = entry_dist + hit.perp_dist;
+
+        match &hit.line_def.back_side_def {
+            None => {
+                // solid wall — draw it
+                let x = hit_to_screen_x(view_info, index);
+                let wall_bottom = 0.0;
+                let wall_top = wall_bottom + WALL_HEIGHT;
+                let top_relative = wall_top - view_info.eye_height;
+                let bottom_relative = wall_bottom - view_info.eye_height;
+                let top_screen = (top_relative * view_info.view_distance) / total_dist;
+                let bottom_screen = (bottom_relative * view_info.view_distance) / total_dist;
+                gizmos.line_2d(
+                    Vec2::new(x, top_screen),
+                    Vec2::new(x, bottom_screen),
+                    hit.line_def.front_side_def.middle_texture.unwrap_or_default()
+                );
+            }
+            Some(back) => {
+                // another portal — keep going
+                render_portal(
+                    index,
+                    player_cache,
+                    hit.pos,
+                    total_dist,
+                    &map.sectors[back.sector],
+                    view_info,
+                    gizmos,
+                    map
+                );
+            }
+        }
+    }
+}
 pub fn get_relative_coords(transform: &Transform, coords: Vec2) -> Vec2 {
     let dx = coords.x - transform.translation.x;
     let dy = coords.y - transform.translation.y;

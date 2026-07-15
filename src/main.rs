@@ -48,16 +48,7 @@ fn main() {
         .init_state::<MapViewMode>()
         // .add_systems(Update, ray::get_hits)
         .add_systems(Update, render)
-        .insert_resource(Map {
-            sectors: vec![Sector {
-                walls: vec![
-                    LineDef::new(0.0, 0.0, -100.0, 100.0, Color::srgb(0.0, 0.0, 1.0)),
-                    LineDef::new(-100.0, 100.0, 0.0, 200.0, Color::srgb(1.0, 0.5, 0.0)),
-                    LineDef::new(0.0, 200.0, 100.0, 100.0, Color::srgb(1.0, 0.5, 0.0)),
-                    LineDef::new(0.0, 0.0, 100.0, 100.0, Color::srgb(0.0, 1.0, 1.0))
-                ],
-            }],
-        })
+        .insert_resource(test_map())
         .insert_resource(ViewInfo::default())
         .insert_resource(Hits::default())
         .insert_resource(PlayerCameraCache::default())
@@ -119,7 +110,7 @@ fn setup(mut commands: Commands) {
     commands.insert_resource(MapWindow { id: map_win });
 
     //Spawn Map player
-    commands.spawn((Player, Transform::default()));
+    commands.spawn((Player, Transform::from_xyz(50.0, 50.0, 0.0)));
 }
 
 //Setup for different Gizmo configs
@@ -138,5 +129,71 @@ fn sync_player_camera(
 ) {
     if let Ok(transform) = query.single() {
         cache.transform = *transform;
+    }
+}
+pub fn test_map() -> Map {
+    Map {
+        sectors: vec![
+            // Sector 0: starting room (0,0) to (100,100)
+            Sector {
+                walls: vec![
+                    // south wall - solid
+                    LineDef::new(0.0, 0.0, 100.0, 0.0, Color::srgb(1.0, 0.0, 0.0)),
+
+                    // east wall lower segment - solid
+                    LineDef::new(100.0, 0.0, 100.0, 40.0, Color::srgb(0.0, 1.0, 0.0)),
+
+                    // east wall doorway (40..60) - portal to sector 1
+                    portal(100.0, 40.0, 100.0, 60.0, 1),
+
+                    // east wall upper segment - solid
+                    LineDef::new(100.0, 60.0, 100.0, 100.0, Color::srgb(0.0, 1.0, 0.0)),
+
+                    // north wall - solid
+                    LineDef::new(100.0, 100.0, 0.0, 100.0, Color::srgb(0.0, 0.0, 1.0)),
+
+                    // west wall - solid
+                    LineDef::new(0.0, 100.0, 0.0, 0.0, Color::srgb(1.0, 1.0, 0.0))
+                ],
+            },
+            // Sector 1: narrow corridor (100,40) to (150,60)
+            Sector {
+                walls: vec![
+                    // south wall - solid
+                    LineDef::new(100.0, 40.0, 150.0, 40.0, Color::srgb(0.5, 0.5, 0.5)),
+
+                    // east side - portal to sector 2
+                    portal(150.0, 40.0, 150.0, 60.0, 2),
+
+                    // north wall - solid
+                    LineDef::new(150.0, 60.0, 100.0, 60.0, Color::srgb(0.5, 0.5, 0.5)),
+
+                    // west side - portal back to sector 0
+                    portal(100.0, 60.0, 100.0, 40.0, 0)
+                ],
+            },
+            // Sector 2: second room (150,0) to (250,100)
+            Sector {
+                walls: vec![
+                    // south wall - solid
+                    LineDef::new(150.0, 0.0, 250.0, 0.0, Color::srgb(1.0, 0.0, 1.0)),
+
+                    // east wall - solid
+                    LineDef::new(250.0, 0.0, 250.0, 100.0, Color::srgb(0.0, 1.0, 1.0)),
+
+                    // north wall - solid
+                    LineDef::new(250.0, 100.0, 150.0, 100.0, Color::srgb(1.0, 0.5, 0.0)),
+
+                    // west wall upper segment - solid
+                    LineDef::new(150.0, 100.0, 150.0, 60.0, Color::srgb(1.0, 1.0, 0.0)),
+
+                    // west wall doorway (40..60) - portal back to sector 1
+                    portal(150.0, 60.0, 150.0, 40.0, 1),
+
+                    // west wall lower segment - solid
+                    LineDef::new(150.0, 40.0, 150.0, 0.0, Color::srgb(1.0, 1.0, 0.0))
+                ],
+            }
+        ],
     }
 }

@@ -15,7 +15,7 @@ pub struct Map {
     pub sectors: Vec<Sector>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct LineDef {
     pub start: Vec2,
     pub end: Vec2,
@@ -23,11 +23,12 @@ pub struct LineDef {
     pub back_side_def: Option<SideDef>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct SideDef {
     pub upper_texture: Option<Color>,
     pub middle_texture: Option<Color>,
     pub lower_texture: Option<Color>,
+    pub sector: usize,
 }
 
 #[derive(Resource)]
@@ -45,10 +46,31 @@ pub enum MapViewMode {
     Absolute,
 }
 
+pub fn portal(x0: f32, y0: f32, x1: f32, y1: f32, back_sector: usize) -> LineDef {
+    LineDef {
+        start: Vec2::new(x0, y0),
+        end: Vec2::new(x1, y1),
+        front_side_def: SideDef {
+            middle_texture: None, // no middle texture -> see-through
+            ..default()
+        },
+        back_side_def: Some(SideDef {
+            middle_texture: None,
+            sector: back_sector,
+            ..Default::default()
+        }),
+    }
+}
+
 impl LineDef {
     pub fn new(x0: f32, y0: f32, x1: f32, y1: f32, color: Color) -> Self {
         let front_side_def = SideDef { middle_texture: Some(color), ..default() };
-        LineDef { start: Vec2::new(x0, y0), end: Vec2::new(x1, y1), front_side_def, ..default() }
+        LineDef {
+            start: Vec2::new(x0, y0),
+            end: Vec2::new(x1, y1),
+            front_side_def,
+            back_side_def: None,
+        }
     }
 }
 

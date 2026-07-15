@@ -13,7 +13,7 @@ pub struct WallHit {
     pub pos: Vec2,
     pub perp_dist: f32,
     pub sector_id: usize,
-    pub color: Option<Color>,
+    pub line_def: LineDef,
 }
 
 #[derive(Resource)]
@@ -132,7 +132,7 @@ pub fn get_sector_hits(
         let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * view_info.max_distance;
         let ray = Ray { start: start.truncate(), sec_point: end.truncate() };
 
-        let mut nearest_hit: Option<(Vec2, Color)> = None;
+        let mut nearest_hit: Option<(Vec2, LineDef)> = None;
         let mut nearest_dist_sq = f32::MAX;
 
         for wall in &sector.walls {
@@ -140,10 +140,7 @@ pub fn get_sector_hits(
                 let dist_sq = origin.distance_squared(hit);
                 if dist_sq < nearest_dist_sq {
                     nearest_dist_sq = dist_sq;
-                    nearest_hit = Some((
-                        hit,
-                        wall.front_side_def.middle_texture.unwrap_or_default(),
-                    ));
+                    nearest_hit = Some((hit, wall.clone()));
                 }
             }
         }
@@ -153,7 +150,7 @@ pub fn get_sector_hits(
             hits.hits[i] = Some(WallHit {
                 pos: hit.0,
                 perp_dist: perp_dist,
-                color: Some(hit.1),
+                line_def: hit.1,
                 ..default()
             });
         } else {

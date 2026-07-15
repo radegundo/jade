@@ -22,26 +22,27 @@ pub fn render(
     }
     for i in 0..RAY_COUNT {
         if let Some(hit) = &hits.hits[i] {
-            let x = hit_to_screen_x(&view_info, i);
-            let wall_bottom = 0.0;
-            let wall_top = wall_bottom + WALL_HEIGHT;
-            let top_relative = wall_top - view_info.eye_height;
-            let bottom_relative = wall_bottom - view_info.eye_height;
+            if hit.line_def.back_side_def.is_none() {
+                let x = hit_to_screen_x(&view_info, i);
+                let wall_bottom = 0.0;
+                let wall_top = wall_bottom + WALL_HEIGHT;
+                let top_relative = wall_top - view_info.eye_height;
+                let bottom_relative = wall_bottom - view_info.eye_height;
 
-            let top_screen = (top_relative * view_info.view_distance) / hit.perp_dist;
-            let bottom_screen = (bottom_relative * view_info.view_distance) / hit.perp_dist;
+                let top_screen = (top_relative * view_info.view_distance) / hit.perp_dist;
+                let bottom_screen = (bottom_relative * view_info.view_distance) / hit.perp_dist;
 
-            gizmos.line_2d(
-                Vec2::new(x, top_screen),
-                Vec2::new(x, bottom_screen),
-                hit.color.unwrap_or_default()
-            );
+                gizmos.line_2d(
+                    Vec2::new(x, top_screen),
+                    Vec2::new(x, bottom_screen),
+                    hit.line_def.front_side_def.middle_texture.unwrap_or_default()
+                );
+            }
         }
     }
     // if let Ok((transform, view_info)) = query.single() && let Ok(window) = window_query.single() {
     // THROW OUT WALLS WITH Y < 0 -> Get relative coords
     // FIGURE OUT CLIPPING??
-    // BSP?? -> Render per sector
     // GET WALL X COORDS ON SCREEN
     // IDEK MAN
     // }

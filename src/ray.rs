@@ -109,7 +109,7 @@ pub fn get_single_hit(
             pos: hit.0,
             perp_dist: perp_dist,
             line_def: hit.1,
-            ..default()
+            sector_id: sector.id,
         })
     } else {
         None

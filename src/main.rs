@@ -22,7 +22,7 @@ mod render;
 const WINDOW_WIDTH: usize = 1920;
 const WINDOW_HEIGHT: u32 = 1080;
 
-const WALL_HEIGHT: f32 = 3.0;
+const EYE_OFFSET: f32 = 1.6;
 
 const RAY_COUNT: usize = WINDOW_WIDTH;
 
@@ -39,20 +39,26 @@ fn main() {
                 ..default()
             })
         )
+        //SETUP
         .add_systems(Startup, setup)
         .add_systems(Startup, setup_gizmo_layers)
+        //INPUT
         .add_plugins(OwnInputPlugin)
+        //SYNC
         .add_systems(Update, sync_player_camera)
+        .add_systems(Update, update_eye_height)
+        //MAP
         .add_plugins(AbsoluteMapPlugin)
         .add_plugins(RelativeMapPlugin)
         .init_state::<MapViewMode>()
-        // .add_systems(Update, ray::get_hits)
+        .init_gizmo_group::<MapGizmos>()
+        //RENDER
         .add_systems(Update, render)
-        .insert_resource(test_map())
+        //RESOURCES
         .insert_resource(ViewInfo::default())
+        .insert_resource(test_map())
         .insert_resource(Hits::default())
         .insert_resource(PlayerCameraCache::default())
-        .init_gizmo_group::<MapGizmos>()
         .run();
 }
 
@@ -134,66 +140,38 @@ fn sync_player_camera(
 pub fn test_map() -> Map {
     Map {
         sectors: vec![
-            // Sector 0: starting room (0,0) to (100,100)
-            Sector {
-                walls: vec![
-                    // south wall - solid
-                    LineDef::new(0.0, 0.0, 100.0, 0.0, Color::srgb(1.0, 0.0, 0.0)),
+            SectorBuilder::new(0, 0.0, 100.0)
+                .wall(0.0, 0.0, 100.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
+                .wall(100.0, 0.0, 100.0, 40.0, Color::srgb(0.0, 1.0, 0.0))
+                .portal(100.0, 40.0, 100.0, 60.0, 1) // back_sector only — front is auto = 0
+                .wall(100.0, 60.0, 100.0, 100.0, Color::srgb(0.0, 1.0, 0.0))
+                .wall(100.0, 100.0, 0.0, 100.0, Color::srgb(0.0, 0.0, 1.0))
+                .wall(0.0, 100.0, 0.0, 0.0, Color::srgb(1.0, 1.0, 0.0))
+                .build(),
 
-                    // east wall lower segment - solid
-                    LineDef::new(100.0, 0.0, 100.0, 40.0, Color::srgb(0.0, 1.0, 0.0)),
-
-                    // east wall doorway (40..60) - portal to sector 1
-                    portal(100.0, 40.0, 100.0, 60.0, 1),
-
-                    // east wall upper segment - solid
-                    LineDef::new(100.0, 60.0, 100.0, 100.0, Color::srgb(0.0, 1.0, 0.0)),
-
-                    // north wall - solid
-                    LineDef::new(100.0, 100.0, 0.0, 100.0, Color::srgb(0.0, 0.0, 1.0)),
-
-                    // west wall - solid
-                    LineDef::new(0.0, 100.0, 0.0, 0.0, Color::srgb(1.0, 1.0, 0.0))
-                ],
-            },
-            // Sector 1: narrow corridor (100,40) to (150,60)
-            Sector {
-                walls: vec![
-                    // south wall - solid
-                    LineDef::new(100.0, 40.0, 150.0, 40.0, Color::srgb(0.5, 0.5, 0.5)),
-
-                    // east side - portal to sector 2
-                    portal(150.0, 40.0, 150.0, 60.0, 2),
-
-                    // north wall - solid
-                    LineDef::new(150.0, 60.0, 100.0, 60.0, Color::srgb(0.5, 0.5, 0.5)),
-
-                    // west side - portal back to sector 0
-                    portal(100.0, 60.0, 100.0, 40.0, 0)
-                ],
-            },
-            // Sector 2: second room (150,0) to (250,100)
-            Sector {
-                walls: vec![
-                    // south wall - solid
-                    LineDef::new(150.0, 0.0, 250.0, 0.0, Color::srgb(1.0, 0.0, 1.0)),
-
-                    // east wall - solid
-                    LineDef::new(250.0, 0.0, 250.0, 100.0, Color::srgb(0.0, 1.0, 1.0)),
-
-                    // north wall - solid
-                    LineDef::new(250.0, 100.0, 150.0, 100.0, Color::srgb(1.0, 0.5, 0.0)),
-
-                    // west wall upper segment - solid
-                    LineDef::new(150.0, 100.0, 150.0, 60.0, Color::srgb(1.0, 1.0, 0.0)),
-
-                    // west wall doorway (40..60) - portal back to sector 1
-                    portal(150.0, 60.0, 150.0, 40.0, 1),
-
-                    // west wall lower segment - solid
-                    LineDef::new(150.0, 40.0, 150.0, 0.0, Color::srgb(1.0, 1.0, 0.0))
-                ],
-            }
+            SectorBuilder::new(1, 10.0, 90.0)
+                .wall(100.0, 40.0, 150.0, 40.0, Color::srgb(0.5, 0.5, 0.5))
+                .portal(150.0, 40.0, 150.0, 60.0, 2)
+                .wall(150.0, 60.0, 100.0, 60.0, Color::srgb(0.5, 0.5, 0.5))
+                .portal_with_steps(
+                    100.0,
+                    60.0,
+                    100.0,
+                    40.0,
+                    0,
+                    Some(Color::srgb(0.3, 0.2, 0.1)),
+                    Some(Color::srgb(0.4, 0.3, 0.2))
+                )
+                .build(),
+            SectorBuilder::new(2, 20.0, 100.0)
+                .wall(150.0, 40.0, 150.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
+                .wall(150.0, 0.0, 250.0, 0.0, Color::srgb(1.0, 0.5, 0.0))
+                .wall(150.0, 0.0, 250.0, 0.0, Color::srgb(1.0, 0.5, 0.0))
+                .wall(250.0, 0.0, 250.0, 100.0, Color::srgb(0.7, 0.5, 0.0))
+                .wall(250.0, 100.0, 150.0, 100.0, Color::srgb(0.7, 0.5, 1.0))
+                .wall(150.0, 100.0, 150.0, 60.0, Color::srgb(0.7, 0.5, 1.0))
+                .portal(150.0, 60.0, 150.0, 40.0, 1)
+                .build()
         ],
     }
 }

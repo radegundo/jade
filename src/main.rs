@@ -116,7 +116,7 @@ fn setup(mut commands: Commands) {
     commands.insert_resource(MapWindow { id: map_win });
 
     //Spawn Map player
-    commands.spawn((Player, Transform::from_xyz(50.0, 50.0, 0.0)));
+    commands.spawn((Player, Transform::from_xyz(200.0, 50.0, 0.0)));
 }
 
 //Setup for different Gizmo configs
@@ -143,13 +143,21 @@ pub fn test_map() -> Map {
             SectorBuilder::new(0, 0.0, 100.0)
                 .wall(0.0, 0.0, 100.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
                 .wall(100.0, 0.0, 100.0, 40.0, Color::srgb(0.0, 1.0, 0.0))
-                .portal(100.0, 40.0, 100.0, 60.0, 1) // back_sector only — front is auto = 0
+                .portal_with_steps(
+                    100.0,
+                    40.0,
+                    100.0,
+                    60.0,
+                    1,
+                    Some(Color::srgb(1.0, 1.0, 1.0)),
+                    Some(Color::srgb(1.0, 1.0, 1.0))
+                ) // back_sector only — front is auto = 0
                 .wall(100.0, 60.0, 100.0, 100.0, Color::srgb(0.0, 1.0, 0.0))
                 .wall(100.0, 100.0, 0.0, 100.0, Color::srgb(0.0, 0.0, 1.0))
                 .wall(0.0, 100.0, 0.0, 0.0, Color::srgb(1.0, 1.0, 0.0))
                 .build(),
 
-            SectorBuilder::new(1, 10.0, 90.0)
+            SectorBuilder::new(1, 0.0, 100.0)
                 .wall(100.0, 40.0, 150.0, 40.0, Color::srgb(0.5, 0.5, 0.5))
                 .portal(150.0, 40.0, 150.0, 60.0, 2)
                 .wall(150.0, 60.0, 100.0, 60.0, Color::srgb(0.5, 0.5, 0.5))
@@ -159,18 +167,25 @@ pub fn test_map() -> Map {
                     100.0,
                     40.0,
                     0,
-                    Some(Color::srgb(0.3, 0.2, 0.1)),
-                    Some(Color::srgb(0.4, 0.3, 0.2))
+                    Some(Color::srgb(1.0, 1.0, 1.0)),
+                    Some(Color::srgb(1.0, 1.0, 1.0))
                 )
                 .build(),
-            SectorBuilder::new(2, 20.0, 100.0)
+            SectorBuilder::new(2, -30.0, 100.0)
                 .wall(150.0, 40.0, 150.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
-                .wall(150.0, 0.0, 250.0, 0.0, Color::srgb(1.0, 0.5, 0.0))
                 .wall(150.0, 0.0, 250.0, 0.0, Color::srgb(1.0, 0.5, 0.0))
                 .wall(250.0, 0.0, 250.0, 100.0, Color::srgb(0.7, 0.5, 0.0))
                 .wall(250.0, 100.0, 150.0, 100.0, Color::srgb(0.7, 0.5, 1.0))
                 .wall(150.0, 100.0, 150.0, 60.0, Color::srgb(0.7, 0.5, 1.0))
-                .portal(150.0, 60.0, 150.0, 40.0, 1)
+                .portal_with_steps(
+                    150.0,
+                    60.0,
+                    150.0,
+                    40.0,
+                    1,
+                    Some(Color::srgb(1.0, 1.0, 1.0)),
+                    Some(Color::srgb(1.0, 1.0, 1.0))
+                )
                 .build()
         ],
     }

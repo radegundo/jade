@@ -130,13 +130,6 @@ pub fn portal_wall_with_steps(
     }
 }
 
-// pub fn portal(x0: f32, y0: f32, x1: f32, y1: f32, back_sector: usize) -> LineDef {
-//     // NOTE: front_sector defaults to 0 here since this standalone helper has no
-//     // knowledge of which sector it's being built for. Prefer `SectorBuilder::portal`
-//     // (below) instead, which fills in front_sector automatically and avoids this trap.
-//     portal_wall(x0, y0, x1, y1, 0, back_sector)
-// }
-
 // ============================================================
 // Sector constructors
 // ============================================================

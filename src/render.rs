@@ -72,7 +72,7 @@ pub fn render_portal(
 ) {
     let angle = get_ray_angle(index, &player_cache.transform, view_info);
     let dir = Vec2::new(angle.cos(), angle.sin());
-    let nudged_origin = entry_pos + dir * 0.01;
+    let nudged_origin = entry_pos + dir * 0.05;
 
     let mut nudged_transform = player_cache.transform.clone();
     nudged_transform.translation = nudged_origin.extend(0.0);
@@ -108,6 +108,15 @@ pub fn render_portal(
                     gizmos,
                     map
                 );
+                render_portal_boundaries(
+                    hit.sector_id,
+                    &map.sectors[hit.line_def.front_side_def.sector],
+                    &map.sectors[hit.line_def.back_side_def.clone().unwrap().sector],
+                    &hit.line_def,
+                    total_dist,
+                    gizmos,
+                    &view_info
+                );
             }
         }
     }
@@ -141,7 +150,6 @@ pub fn update_eye_height(
             (target_eye_height - view_info.eye_height) * (speed * time.delta_secs()).min(1.0);
     }
 }
-
 pub fn render_portal_boundaries(
     index: usize,
     front_sector: &Sector,
@@ -152,6 +160,10 @@ pub fn render_portal_boundaries(
     view_info: &ViewInfo
 ) {
     let x = hit_to_screen_x(view_info, index);
+
+    // let front_abs_ceiling = front_sector.floor_height + front_sector.ceiling_height;
+    // let back_abs_ceiling = back_sector.floor_height + back_sector.ceiling_height;
+
     if back_sector.ceiling_height < front_sector.ceiling_height {
         if let Some(color) = &line_def.front_side_def.upper_texture {
             let top = project_height(front_sector.ceiling_height, total_dist, view_info);

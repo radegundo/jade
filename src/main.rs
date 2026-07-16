@@ -185,6 +185,10 @@ pub fn test_map() -> Map {
                 .wall(100.0, 60.0, 100.0, 100.0, Color::srgb(0.0, 1.0, 0.0))
                 .wall(100.0, 100.0, 0.0, 100.0, Color::srgb(0.0, 0.0, 1.0))
                 .wall(0.0, 100.0, 0.0, 0.0, Color::srgb(1.0, 1.0, 0.0))
+                .wall(25.0, 25.0, 75.0, 25.0, Color::srgb(0.3, 0.6, 0.3))
+                .wall(75.0, 25.0, 75.0, 75.0, Color::srgb(0.4, 1.0, 0.2))
+                .wall(75.0, 75.0, 25.0, 75.0, Color::srgb(1.0, 0.2, 0.6))
+                .wall(25.0, 75.0, 25.0, 25.0, Color::srgb(0.4, 0.3, 0.6))
                 .build(),
 
             SectorBuilder::new(
@@ -237,6 +241,12 @@ pub fn test_map() -> Map {
                     Some(Color::srgb(1.0, 1.0, 1.0))
                 )
                 .build()
+            // SectorBuilder::new(4, 0.0, 15.0, Color::srgb(1.0, 0.3, 0.1), Color::srgb(0.4, 0.2, 0.6))
+            //     .wall(25.0, 25.0, 75.0, 25.0, Color::srgb(0.3, 0.6, 0.3))
+            //     .wall(75.0, 25.0, 75.0, 75.0, Color::srgb(0.4, 1.0, 0.2))
+            //     .wall(75.0, 75.0, 25.0, 75.0, Color::srgb(1.0, 0.2, 0.6))
+            //     .wall(25.0, 75.0, 25.0, 25.0, Color::srgb(0.4, 0.3, 0.6))
+            //     .build()
         ],
     }
 }

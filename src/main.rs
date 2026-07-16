@@ -116,7 +116,7 @@ fn setup(mut commands: Commands) {
     commands.insert_resource(MapWindow { id: map_win });
 
     //Spawn Map player
-    commands.spawn((Player, Transform::from_xyz(200.0, 50.0, 0.0)));
+    commands.spawn((Player, Transform::from_xyz(50.0, 50.0, 0.0)));
 }
 
 //Setup for different Gizmo configs
@@ -140,7 +140,13 @@ fn sync_player_camera(
 pub fn test_map() -> Map {
     Map {
         sectors: vec![
-            SectorBuilder::new(0, 0.0, 100.0)
+            SectorBuilder::new(
+                0,
+                0.0,
+                100.0,
+                Color::srgb(1.0, 0.5, 1.0),
+                Color::srgb(1.0, 0.5, 0.0)
+            )
                 .wall(0.0, 0.0, 100.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
                 .wall(100.0, 0.0, 100.0, 40.0, Color::srgb(0.0, 1.0, 0.0))
                 .portal_with_steps(
@@ -157,7 +163,13 @@ pub fn test_map() -> Map {
                 .wall(0.0, 100.0, 0.0, 0.0, Color::srgb(1.0, 1.0, 0.0))
                 .build(),
 
-            SectorBuilder::new(1, 0.0, 100.0)
+            SectorBuilder::new(
+                1,
+                0.0,
+                100.0,
+                Color::srgb(1.0, 0.5, 1.0),
+                Color::srgb(1.0, 0.5, 0.0)
+            )
                 .wall(100.0, 40.0, 150.0, 40.0, Color::srgb(0.5, 0.5, 0.5))
                 .portal(150.0, 40.0, 150.0, 60.0, 2)
                 .wall(150.0, 60.0, 100.0, 60.0, Color::srgb(0.5, 0.5, 0.5))
@@ -171,7 +183,13 @@ pub fn test_map() -> Map {
                     Some(Color::srgb(1.0, 1.0, 1.0))
                 )
                 .build(),
-            SectorBuilder::new(2, -30.0, 100.0)
+            SectorBuilder::new(
+                2,
+                -30.0,
+                100.0,
+                Color::srgb(1.0, 0.5, 1.0),
+                Color::srgb(1.0, 0.5, 0.0)
+            )
                 .wall(150.0, 40.0, 150.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
                 .wall(150.0, 0.0, 250.0, 0.0, Color::srgb(1.0, 0.5, 0.0))
                 .wall(250.0, 0.0, 250.0, 100.0, Color::srgb(0.7, 0.5, 0.0))

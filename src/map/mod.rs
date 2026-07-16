@@ -12,6 +12,8 @@ pub struct Sector {
     pub ceiling_height: f32,
     pub floor_height: f32,
     pub id: usize,
+    pub floor_texture: Color,
+    pub ceiling_texture: Color,
 }
 
 #[derive(Resource)]
@@ -142,9 +144,11 @@ pub fn rect_sector(
     max: Vec2,
     floor_height: f32,
     ceiling_height: f32,
-    wall_color: Color
+    wall_color: Color,
+    floor_color: Color,
+    ceiling_color: Color
 ) -> Sector {
-    SectorBuilder::new(self_index, floor_height, ceiling_height)
+    SectorBuilder::new(self_index, floor_height, ceiling_height, floor_color, ceiling_color)
         .wall(min.x, min.y, max.x, min.y, wall_color)
         .wall(max.x, min.y, max.x, max.y, wall_color)
         .wall(max.x, max.y, min.x, max.y, wall_color)
@@ -158,15 +162,25 @@ pub struct SectorBuilder {
     floor_height: f32,
     ceiling_height: f32,
     self_index: usize,
+    floor_texture: Color,
+    ceiling_texture: Color,
 }
 
 impl SectorBuilder {
-    pub fn new(self_index: usize, floor_height: f32, ceiling_height: f32) -> Self {
+    pub fn new(
+        self_index: usize,
+        floor_height: f32,
+        ceiling_height: f32,
+        floor_texture: Color,
+        ceiling_texture: Color
+    ) -> Self {
         SectorBuilder {
             walls: Vec::new(),
             floor_height,
             ceiling_height,
             self_index,
+            floor_texture,
+            ceiling_texture,
         }
     }
 
@@ -216,6 +230,8 @@ impl SectorBuilder {
             floor_height: self.floor_height,
             ceiling_height: self.ceiling_height,
             id: self.self_index,
+            floor_texture: self.floor_texture,
+            ceiling_texture: self.ceiling_texture,
         }
     }
 }

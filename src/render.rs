@@ -11,16 +11,13 @@ pub fn render(
     map: Res<Map>
 ) {
     let player_pos = player_cache.transform.translation.truncate();
-    let player_sector_idx = find_player_sector(player_pos, &map); // rename to avoid clashing with the loop's `i`
-
-    if let Some(sector_idx) = player_sector_idx {
-        get_sector_hits(&player_cache, &mut hits, &map.sectors[sector_idx], sector_idx, &view_info);
+    if let Some(i) = find_player_sector(player_pos, &map) {
+        get_sector_hits(&player_cache, &mut hits, &map.sectors[i], i, &view_info);
     } else {
         for hit in hits.hits.iter_mut() {
             *hit = None;
         }
     }
-
     for i in 0..RAY_COUNT {
         if let Some(hit) = &hits.hits[i] {
             if hit.line_def.back_side_def.is_none() {
@@ -39,18 +36,6 @@ pub fn render(
                     hit.line_def.front_side_def.middle_texture.unwrap_or_default()
                 );
             } else {
-                let back = hit.line_def.back_side_def.clone().unwrap();
-                if let Some(current_sector_idx) = player_sector_idx {
-                    render_portal_boundary(
-                        i,
-                        &map.sectors[current_sector_idx],
-                        &map.sectors[back.sector],
-                        &hit.line_def,
-                        hit.perp_dist,
-                        &view_info,
-                        &mut gizmos
-                    );
-                }
                 render_portal(
                     i,
                     &player_cache,
@@ -120,8 +105,8 @@ pub fn render_portal(
                 );
                 render_portal_boundary(
                     index,
-                    &map.sectors[hit.line_def.front_side_def.sector],
                     &map.sectors[back.sector],
+                    &map.sectors[hit.line_def.front_side_def.sector],
                     &hit.line_def,
                     total_dist,
                     view_info,

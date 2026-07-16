@@ -8,7 +8,8 @@ pub fn render(
     mut hits: ResMut<Hits>,
     view_info: Res<ViewInfo>,
     player_cache: Res<PlayerCameraCache>,
-    map: Res<Map>
+    map: Res<Map>,
+    mut clip: ResMut<Vclip>
 ) {
     let player_pos = player_cache.transform.translation.truncate();
     if let Some(i) = find_player_sector(player_pos, &map) {
@@ -18,144 +19,19 @@ pub fn render(
             *hit = None;
         }
     }
+
     for i in 0..RAY_COUNT {
         if let Some(hit) = &hits.hits[i] {
-            let x = hit_to_screen_x(&view_info, i);
-            let wall_bottom = map.sectors[hit.sector_id].floor_height;
-            let wall_top = map.sectors[hit.sector_id].ceiling_height;
-
-            let top_screen = project_height(wall_top, hit.perp_dist, &view_info);
-            let bottom_screen = project_height(wall_bottom, hit.perp_dist, &view_info);
-
-            //DRAW WALLS
-            if hit.line_def.back_side_def.is_none() {
-                gizmos.line_2d(
-                    Vec2::new(x, top_screen),
-                    Vec2::new(x, bottom_screen),
-                    hit.line_def.front_side_def.middle_texture.unwrap_or_default()
-                );
-            } else {
-                render_portal(
-                    i,
-                    &player_cache,
-                    hit.pos,
-                    hit.perp_dist,
-                    &map.sectors[hit.line_def.back_side_def.clone().unwrap().sector],
-                    &view_info,
-                    &mut gizmos,
-                    &map
-                );
-                render_portal_boundaries(
-                    i,
-                    &map.sectors[hit.line_def.front_side_def.sector],
-                    &map.sectors[hit.line_def.back_side_def.clone().unwrap().sector],
-                    &hit.line_def,
-                    hit.perp_dist,
-                    &mut gizmos,
-                    &view_info
-                );
-            }
-
-            //DRAW FLOOR
-            if bottom_screen > -(WINDOW_HEIGHT as f32) / 2.0 {
-                gizmos.line_2d(
-                    Vec2::new(x, bottom_screen),
-                    Vec2::new(x, -(WINDOW_WIDTH as f32) / 2.0),
-                    map.sectors[hit.sector_id].floor_texture
-                );
-            }
-            //DRAW CEILING
-            if top_screen < (WINDOW_HEIGHT as f32) / 2.0 {
-                gizmos.line_2d(
-                    Vec2::new(x, top_screen),
-                    Vec2::new(x, (WINDOW_HEIGHT as f32) / 2.0),
-                    map.sectors[hit.sector_id].ceiling_texture
-                );
-            }
-        }
-    }
-}
-
-pub fn render_portal(
-    index: usize,
-    player_cache: &PlayerCameraCache,
-    entry_pos: Vec2,
-    entry_dist: f32,
-    sector: &Sector,
-    view_info: &ViewInfo,
-    gizmos: &mut Gizmos,
-    map: &Map
-) {
-    let angle = get_ray_angle(index, &player_cache.transform, view_info);
-    let dir = Vec2::new(angle.cos(), angle.sin());
-    let nudged_origin = entry_pos + dir * 0.05;
-
-    let mut nudged_transform = player_cache.transform.clone();
-    nudged_transform.translation = nudged_origin.extend(0.0);
-
-    if let Some(hit) = get_single_hit(&nudged_transform, view_info, sector, index) {
-        let total_dist = entry_dist + hit.perp_dist;
-
-        let x = hit_to_screen_x(view_info, index);
-        let wall_bottom = map.sectors[hit.sector_id].floor_height;
-        let wall_top = map.sectors[hit.sector_id].ceiling_height;
-
-        let top_screen = project_height(wall_top, hit.perp_dist, &view_info);
-        let bottom_screen = project_height(wall_bottom, hit.perp_dist, &view_info);
-
-        // let top_relative = wall_top - view_info.eye_height;
-        // let bottom_relative = wall_bottom - view_info.eye_height;
-        // let top_screen = (top_relative * view_info.view_distance) / total_dist;
-        // let bottom_screen = (bottom_relative * view_info.view_distance) / total_dist;
-
-        match &hit.line_def.back_side_def {
-            None => {
-                // solid wall — draw it
-
-                //Draw walls
-                gizmos.line_2d(
-                    Vec2::new(x, top_screen),
-                    Vec2::new(x, bottom_screen),
-                    hit.line_def.front_side_def.middle_texture.unwrap_or_default()
-                );
-            }
-            Some(back) => {
-                // another portal — keep going
-                render_portal(
-                    index,
-                    player_cache,
-                    hit.pos,
-                    total_dist,
-                    &map.sectors[back.sector],
-                    view_info,
-                    gizmos,
-                    map
-                );
-                render_portal_boundaries(
-                    hit.sector_id,
-                    &map.sectors[hit.line_def.front_side_def.sector],
-                    &map.sectors[hit.line_def.back_side_def.clone().unwrap().sector],
-                    &hit.line_def,
-                    total_dist,
-                    gizmos,
-                    &view_info
-                );
-            }
-        }
-        //DRAW FLOOR
-        if bottom_screen > -(WINDOW_HEIGHT as f32) / 2.0 {
-            gizmos.line_2d(
-                Vec2::new(x, bottom_screen),
-                Vec2::new(x, -(WINDOW_HEIGHT as f32) / 2.0),
-                map.sectors[hit.sector_id].floor_texture
-            );
-        }
-        //DRAW CEILING
-        if top_screen < (WINDOW_HEIGHT as f32) / 2.0 {
-            gizmos.line_2d(
-                Vec2::new(x, top_screen),
-                Vec2::new(x, (WINDOW_HEIGHT as f32) / 2.0),
-                map.sectors[hit.sector_id].ceiling_texture
+            clip.0[i] = VBounds::full();
+            render_column(
+                i,
+                &player_cache,
+                hit.perp_dist,
+                hit,
+                clip.0[i],
+                &view_info,
+                &mut gizmos,
+                &map
             );
         }
     }
@@ -189,37 +65,141 @@ pub fn update_eye_height(
             (target_eye_height - view_info.eye_height) * (speed * time.delta_secs()).min(1.0);
     }
 }
-pub fn render_portal_boundaries(
-    index: usize,
-    front_sector: &Sector,
-    back_sector: &Sector,
-    line_def: &LineDef,
-    total_dist: f32,
-    gizmos: &mut Gizmos,
-    view_info: &ViewInfo
-) {
-    let x = hit_to_screen_x(view_info, index);
-
-    // let front_abs_ceiling = front_sector.floor_height + front_sector.ceiling_height;
-    // let back_abs_ceiling = back_sector.floor_height + back_sector.ceiling_height;
-
-    if back_sector.ceiling_height < front_sector.ceiling_height {
-        if let Some(color) = &line_def.front_side_def.upper_texture {
-            let top = project_height(front_sector.ceiling_height, total_dist, view_info);
-            let bottom = project_height(back_sector.ceiling_height, total_dist, view_info);
-            gizmos.line_2d(Vec2::new(x, top), Vec2::new(x, bottom), *color);
-        }
-    }
-    if back_sector.floor_height > front_sector.floor_height {
-        if let Some(color) = &line_def.front_side_def.lower_texture {
-            let top = project_height(back_sector.floor_height, total_dist, view_info);
-            let bottom = project_height(front_sector.floor_height, total_dist, view_info);
-            gizmos.line_2d(Vec2::new(x, top), Vec2::new(x, bottom), *color);
-        }
-    }
-}
 
 fn project_height(world_height: f32, dist: f32, view_info: &ViewInfo) -> f32 {
     let relative = world_height - view_info.eye_height;
     (relative * view_info.view_distance) / dist + view_info.pitch
+}
+
+pub fn render_column(
+    index: usize,
+    player_cache: &PlayerCameraCache,
+    total_dist: f32,
+    hit: &WallHit,
+    mut clip: VBounds,
+    view_info: &ViewInfo,
+    gizmos: &mut Gizmos,
+    map: &Map
+) {
+    let x = hit_to_screen_x(view_info, index);
+    let sector = &map.sectors[hit.sector_id];
+
+    let wall_top_screen = project_height(sector.ceiling_height, total_dist, view_info).clamp(
+        clip.bottom,
+        clip.top
+    );
+    let wall_bottom_screen = project_height(sector.floor_height, total_dist, view_info).clamp(
+        clip.bottom,
+        clip.top
+    );
+
+    match &hit.line_def.back_side_def {
+        None => {
+            // Solid wall —> draw within the clip window, then stop.
+            gizmos.line_2d(
+                Vec2::new(x, wall_top_screen),
+                Vec2::new(x, wall_bottom_screen),
+                hit.line_def.front_side_def.middle_texture.unwrap_or_default()
+            );
+
+            draw_floor(x, wall_bottom_screen, clip.bottom, sector.floor_texture, gizmos);
+            draw_ceiling(x, wall_top_screen, clip.top, sector.ceiling_texture, gizmos);
+        }
+        Some(back) => {
+            let back_sector = &map.sectors[back.sector];
+
+            draw_floor(x, wall_bottom_screen, clip.bottom, sector.floor_texture, gizmos);
+            draw_ceiling(x, wall_top_screen, clip.top, sector.ceiling_texture, gizmos);
+
+            // Upper step (lowered ceiling ahead)
+            if back_sector.ceiling_height < sector.ceiling_height {
+                let upper_bottom = project_height(
+                    back_sector.ceiling_height,
+                    total_dist,
+                    view_info
+                ).clamp(clip.bottom, clip.top);
+                if let Some(color) = hit.line_def.front_side_def.upper_texture {
+                    gizmos.line_2d(
+                        Vec2::new(x, wall_top_screen),
+                        Vec2::new(x, upper_bottom),
+                        color
+                    );
+                }
+                clip.top = upper_bottom; // <-- SHRINK the window: nothing beyond can draw above this
+            }
+
+            // Lower step (raised floor ahead)
+            if back_sector.floor_height > sector.floor_height {
+                let lower_top = project_height(
+                    back_sector.floor_height,
+                    total_dist,
+                    view_info
+                ).clamp(clip.bottom, clip.top);
+                if let Some(color) = hit.line_def.front_side_def.lower_texture {
+                    gizmos.line_2d(
+                        Vec2::new(x, lower_top),
+                        Vec2::new(x, wall_bottom_screen),
+                        color
+                    );
+                }
+                clip.bottom = lower_top; // <-- SHRINK the window: nothing beyond can draw below this
+            }
+            // Lower floor ahead
+            if back_sector.floor_height < sector.floor_height {
+                let lower_top = project_height(sector.floor_height, total_dist, view_info).clamp(
+                    clip.bottom,
+                    clip.top
+                );
+                clip.bottom = lower_top;
+            }
+            if back_sector.ceiling_height > sector.ceiling_height {
+                let upper_bottom = project_height(
+                    sector.ceiling_height,
+                    total_dist,
+                    view_info
+                ).clamp(clip.bottom, clip.top);
+                clip.top = upper_bottom;
+            }
+
+            // Step into the next sector, carrying the SHRUNKEN clip forward
+            let angle = get_ray_angle(index, &player_cache.transform, view_info);
+            let dir = Vec2::new(angle.cos(), angle.sin());
+            let nudged_origin = hit.pos + dir * 0.05;
+            let mut nudged_transform = player_cache.transform.clone();
+            nudged_transform.translation = nudged_origin.extend(0.0);
+
+            if
+                let Some(next_hit) = get_single_hit(
+                    &nudged_transform,
+                    view_info,
+                    back_sector,
+                    index
+                )
+            {
+                let next_total_dist = total_dist + next_hit.perp_dist;
+                render_column(
+                    index,
+                    player_cache,
+                    next_total_dist,
+                    &next_hit,
+                    clip,
+                    view_info,
+                    gizmos,
+                    map
+                );
+            }
+        }
+    }
+}
+
+fn draw_floor(x: f32, wall_bottom: f32, clip_bottom: f32, color: Color, gizmos: &mut Gizmos) {
+    if wall_bottom > clip_bottom {
+        gizmos.line_2d(Vec2::new(x, wall_bottom), Vec2::new(x, clip_bottom), color);
+    }
+}
+
+fn draw_ceiling(x: f32, wall_top: f32, clip_top: f32, color: Color, gizmos: &mut Gizmos) {
+    if wall_top < clip_top {
+        gizmos.line_2d(Vec2::new(x, wall_top), Vec2::new(x, clip_top), color);
+    }
 }

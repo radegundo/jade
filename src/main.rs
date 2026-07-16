@@ -60,6 +60,7 @@ fn main() {
         .insert_resource(test_map())
         .insert_resource(Hits::default())
         .insert_resource(PlayerCameraCache::default())
+        .insert_resource(Vclip::full())
         .run();
 }
 
@@ -85,6 +86,32 @@ impl Default for ViewInfo {
         let eye_height = 1.8;
         let pitch = 0.0;
         ViewInfo { fov, max_distance: 500.0, view_distance, eye_height, pitch }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct VBounds {
+    pub top: f32,
+    pub bottom: f32,
+}
+
+#[derive(Resource)]
+pub struct Vclip(pub Vec<VBounds>);
+
+impl Vclip {
+    pub fn full() -> Self {
+        let mut vclip = Vclip(Vec::new());
+        for _ in 0..WINDOW_WIDTH {
+            vclip.0.push(VBounds::full());
+        }
+        vclip
+    }
+}
+
+impl VBounds {
+    pub fn full() -> Self {
+        let (top, bottom) = ((WINDOW_HEIGHT as f32) / 2.0, -(WINDOW_HEIGHT as f32) / 2.0);
+        VBounds { top: top, bottom: bottom }
     }
 }
 
@@ -143,7 +170,7 @@ fn sync_player_camera(
 pub fn test_map() -> Map {
     Map {
         sectors: vec![
-            SectorBuilder::new(0, 0.0, 30.0, Color::srgb(1.0, 0.5, 1.0), Color::srgb(1.0, 0.5, 0.0))
+            SectorBuilder::new(0, 0.0, 25.0, Color::srgb(1.0, 0.5, 1.0), Color::srgb(1.0, 0.0, 0.0))
                 .wall(0.0, 0.0, 100.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
                 .wall(100.0, 0.0, 100.0, 40.0, Color::srgb(0.0, 1.0, 0.0))
                 .portal_with_steps(
@@ -168,7 +195,15 @@ pub fn test_map() -> Map {
                 Color::srgb(1.0, 0.5, 0.0)
             )
                 .wall(100.0, 40.0, 150.0, 40.0, Color::srgb(0.5, 0.5, 0.5))
-                .portal(150.0, 40.0, 150.0, 60.0, 2)
+                .portal_with_steps(
+                    150.0,
+                    40.0,
+                    150.0,
+                    60.0,
+                    2,
+                    Some(Color::srgb(1.0, 0.0, 0.5)),
+                    Some(Color::srgb(1.0, 0.0, 0.5))
+                )
                 .wall(150.0, 60.0, 100.0, 60.0, Color::srgb(0.5, 0.5, 0.5))
                 .portal_with_steps(
                     100.0,
@@ -176,16 +211,16 @@ pub fn test_map() -> Map {
                     100.0,
                     40.0,
                     0,
-                    Some(Color::srgb(1.0, 1.0, 1.0)),
+                    Some(Color::srgb(1.0, 1.0, 0.0)),
                     Some(Color::srgb(1.0, 1.0, 1.0))
                 )
                 .build(),
             SectorBuilder::new(
                 2,
                 -10.0,
-                30.0,
+                25.0,
                 Color::srgb(1.0, 0.5, 1.0),
-                Color::srgb(1.0, 0.5, 0.0)
+                Color::srgb(1.0, 0.0, 0.0)
             )
                 .wall(150.0, 40.0, 150.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
                 .wall(150.0, 0.0, 250.0, 0.0, Color::srgb(1.0, 0.5, 0.0))
@@ -198,7 +233,7 @@ pub fn test_map() -> Map {
                     150.0,
                     40.0,
                     1,
-                    Some(Color::srgb(1.0, 1.0, 1.0)),
+                    Some(Color::srgb(1.0, 0.0, 0.0)),
                     Some(Color::srgb(1.0, 1.0, 1.0))
                 )
                 .build()

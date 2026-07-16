@@ -105,8 +105,8 @@ pub fn render_portal(
                 );
                 render_portal_boundary(
                     index,
-                    &map.sectors[back.sector],
                     &map.sectors[hit.line_def.front_side_def.sector],
+                    &map.sectors[back.sector],
                     &hit.line_def,
                     total_dist,
                     view_info,

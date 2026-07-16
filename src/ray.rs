@@ -70,11 +70,10 @@ pub fn get_sector_hits(
     player_cache: &PlayerCameraCache,
     hits: &mut Hits,
     sector: &Sector,
-    sector_idx: usize,
     view_info: &ViewInfo
 ) {
     for i in 0..RAY_COUNT {
-        hits.hits[i] = get_single_hit(&player_cache.transform, view_info, sector, sector_idx, i);
+        hits.hits[i] = get_single_hit(&player_cache.transform, view_info, sector, i);
     }
 }
 
@@ -82,7 +81,6 @@ pub fn get_single_hit(
     transform: &Transform,
     view_info: &ViewInfo,
     sector: &Sector,
-    sector_idx: usize,
     index: usize
 ) -> Option<WallHit> {
     let origin = transform.translation.truncate();
@@ -110,8 +108,8 @@ pub fn get_single_hit(
         Some(WallHit {
             pos: hit.0,
             perp_dist: perp_dist,
-            sector_id: sector_idx,
             line_def: hit.1,
+            ..default()
         })
     } else {
         None

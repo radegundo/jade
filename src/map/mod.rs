@@ -6,8 +6,6 @@ use bevy::prelude::*;
 #[derive(Resource)]
 pub struct Sector {
     pub walls: Vec<LineDef>,
-    pub ceiling_height: f32,
-    pub floor_height: f32,
 }
 
 #[derive(Resource)]
@@ -52,15 +50,11 @@ pub fn portal(x0: f32, y0: f32, x1: f32, y1: f32, back_sector: usize) -> LineDef
         end: Vec2::new(x1, y1),
         front_side_def: SideDef {
             middle_texture: None, // no middle texture -> see-through
-            lower_texture: Some(Color::WHITE),
-            upper_texture: Some(Color::WHITE),
             ..default()
         },
         back_side_def: Some(SideDef {
             middle_texture: None,
             sector: back_sector,
-            lower_texture: Some(Color::WHITE),
-            upper_texture: Some(Color::WHITE),
             ..Default::default()
         }),
     }
@@ -68,12 +62,7 @@ pub fn portal(x0: f32, y0: f32, x1: f32, y1: f32, back_sector: usize) -> LineDef
 
 impl LineDef {
     pub fn new(x0: f32, y0: f32, x1: f32, y1: f32, color: Color) -> Self {
-        let front_side_def = SideDef {
-            middle_texture: Some(color),
-            lower_texture: Some(Color::WHITE),
-            upper_texture: Some(Color::WHITE),
-            ..default()
-        };
+        let front_side_def = SideDef { middle_texture: Some(color), ..default() };
         LineDef {
             start: Vec2::new(x0, y0),
             end: Vec2::new(x1, y1),

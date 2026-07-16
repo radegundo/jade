@@ -1,7 +1,7 @@
 use bevy::{
     camera::{ RenderTarget, visibility::RenderLayers },
     prelude::*,
-    window::{ WindowRef, WindowResolution },
+    window::{ PresentMode, WindowRef, WindowResolution },
 };
 use bevy_grid::*;
 
@@ -33,6 +33,7 @@ fn main() {
                 primary_window: Some(Window {
                     title: "My Bevy App".to_string(),
                     resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT),
+                    present_mode: PresentMode::AutoVsync,
                     resizable: false,
                     ..default()
                 }),
@@ -73,6 +74,7 @@ pub struct ViewInfo {
     //Distance which the screen sits from the players point of view
     pub view_distance: f32,
     pub eye_height: f32,
+    pub pitch: f32,
 }
 
 impl Default for ViewInfo {
@@ -81,7 +83,8 @@ impl Default for ViewInfo {
         //Calculate the distance from the camera to the screen
         let view_distance = (WINDOW_WIDTH as f32) / 2.0 / (fov.to_radians() / 2.0).tan();
         let eye_height = 1.8;
-        ViewInfo { fov, max_distance: 500.0, view_distance, eye_height }
+        let pitch = 0.0;
+        ViewInfo { fov, max_distance: 500.0, view_distance, eye_height, pitch }
     }
 }
 

@@ -22,12 +22,10 @@ pub fn render(
         if let Some(hit) = &hits.hits[i] {
             let x = hit_to_screen_x(&view_info, i);
             let wall_bottom = map.sectors[hit.sector_id].floor_height;
-            let wall_top = wall_bottom + map.sectors[hit.sector_id].ceiling_height;
-            let top_relative = wall_top - view_info.eye_height;
-            let bottom_relative = wall_bottom - view_info.eye_height;
+            let wall_top = map.sectors[hit.sector_id].ceiling_height;
 
-            let top_screen = (top_relative * view_info.view_distance) / hit.perp_dist;
-            let bottom_screen = (bottom_relative * view_info.view_distance) / hit.perp_dist;
+            let top_screen = project_height(wall_top, hit.perp_dist, &view_info);
+            let bottom_screen = project_height(wall_bottom, hit.perp_dist, &view_info);
 
             //DRAW WALLS
             if hit.line_def.back_side_def.is_none() {
@@ -63,7 +61,7 @@ pub fn render(
                 gizmos.line_2d(
                     Vec2::new(x, bottom_screen),
                     Vec2::new(x, -(WINDOW_WIDTH as f32) / 2.0),
-                    map.sectors[hit.line_def.front_side_def.sector].floor_texture
+                    map.sectors[hit.sector_id].floor_texture
                 );
             }
             //DRAW CEILING
@@ -71,7 +69,7 @@ pub fn render(
                 gizmos.line_2d(
                     Vec2::new(x, top_screen),
                     Vec2::new(x, (WINDOW_HEIGHT as f32) / 2.0),
-                    map.sectors[hit.line_def.front_side_def.sector].ceiling_texture
+                    map.sectors[hit.sector_id].ceiling_texture
                 );
             }
         }
@@ -100,11 +98,15 @@ pub fn render_portal(
 
         let x = hit_to_screen_x(view_info, index);
         let wall_bottom = map.sectors[hit.sector_id].floor_height;
-        let wall_top = wall_bottom + map.sectors[hit.sector_id].ceiling_height;
-        let top_relative = wall_top - view_info.eye_height;
-        let bottom_relative = wall_bottom - view_info.eye_height;
-        let top_screen = (top_relative * view_info.view_distance) / total_dist;
-        let bottom_screen = (bottom_relative * view_info.view_distance) / total_dist;
+        let wall_top = map.sectors[hit.sector_id].ceiling_height;
+
+        let top_screen = project_height(wall_top, hit.perp_dist, &view_info);
+        let bottom_screen = project_height(wall_bottom, hit.perp_dist, &view_info);
+
+        // let top_relative = wall_top - view_info.eye_height;
+        // let bottom_relative = wall_bottom - view_info.eye_height;
+        // let top_screen = (top_relative * view_info.view_distance) / total_dist;
+        // let bottom_screen = (bottom_relative * view_info.view_distance) / total_dist;
 
         match &hit.line_def.back_side_def {
             None => {
@@ -144,8 +146,8 @@ pub fn render_portal(
         if bottom_screen > -(WINDOW_HEIGHT as f32) / 2.0 {
             gizmos.line_2d(
                 Vec2::new(x, bottom_screen),
-                Vec2::new(x, -(WINDOW_WIDTH as f32) / 2.0),
-                map.sectors[hit.line_def.front_side_def.sector].floor_texture
+                Vec2::new(x, -(WINDOW_HEIGHT as f32) / 2.0),
+                map.sectors[hit.sector_id].floor_texture
             );
         }
         //DRAW CEILING
@@ -153,7 +155,7 @@ pub fn render_portal(
             gizmos.line_2d(
                 Vec2::new(x, top_screen),
                 Vec2::new(x, (WINDOW_HEIGHT as f32) / 2.0),
-                map.sectors[hit.line_def.front_side_def.sector].ceiling_texture
+                map.sectors[hit.sector_id].ceiling_texture
             );
         }
     }
@@ -219,5 +221,5 @@ pub fn render_portal_boundaries(
 
 fn project_height(world_height: f32, dist: f32, view_info: &ViewInfo) -> f32 {
     let relative = world_height - view_info.eye_height;
-    (relative * view_info.view_distance) / dist
+    (relative * view_info.view_distance) / dist + view_info.pitch
 }

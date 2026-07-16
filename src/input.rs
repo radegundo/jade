@@ -1,6 +1,6 @@
 use bevy::{ prelude::* };
 
-use crate::{ Player, map::MapViewMode };
+use crate::{ Player, ViewInfo, map::MapViewMode };
 
 pub struct OwnInputPlugin;
 
@@ -13,7 +13,8 @@ impl Plugin for OwnInputPlugin {
 pub fn input(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut player_query: Query<&mut Transform, With<Player>>,
-    time: Res<Time>
+    time: Res<Time>,
+    mut view_info: ResMut<ViewInfo>
 ) {
     if let Ok(mut transform) = player_query.single_mut() {
         let angle = transform.rotation.to_euler(EulerRot::XYZ).2;
@@ -54,6 +55,13 @@ pub fn input(
         }
 
         transform.rotate_z(rotation);
+
+        if keyboard_input.pressed(KeyCode::KeyK) {
+            view_info.pitch += 1.0;
+        }
+        if keyboard_input.pressed(KeyCode::KeyJ) {
+            view_info.pitch -= 1.0;
+        }
     }
 }
 

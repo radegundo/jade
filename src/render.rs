@@ -66,6 +66,14 @@ pub fn render(
                     map.sectors[hit.line_def.front_side_def.sector].floor_texture
                 );
             }
+            //DRAW CEILING
+            if top_screen < (WINDOW_HEIGHT as f32) / 2.0 {
+                gizmos.line_2d(
+                    Vec2::new(x, top_screen),
+                    Vec2::new(x, (WINDOW_HEIGHT as f32) / 2.0),
+                    map.sectors[hit.line_def.front_side_def.sector].ceiling_texture
+                );
+            }
         }
     }
 }
@@ -138,6 +146,14 @@ pub fn render_portal(
                 Vec2::new(x, bottom_screen),
                 Vec2::new(x, -(WINDOW_WIDTH as f32) / 2.0),
                 map.sectors[hit.line_def.front_side_def.sector].floor_texture
+            );
+        }
+        //DRAW CEILING
+        if top_screen < (WINDOW_HEIGHT as f32) / 2.0 {
+            gizmos.line_2d(
+                Vec2::new(x, top_screen),
+                Vec2::new(x, (WINDOW_HEIGHT as f32) / 2.0),
+                map.sectors[hit.line_def.front_side_def.sector].ceiling_texture
             );
         }
     }

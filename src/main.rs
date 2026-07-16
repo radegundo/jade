@@ -140,13 +140,7 @@ fn sync_player_camera(
 pub fn test_map() -> Map {
     Map {
         sectors: vec![
-            SectorBuilder::new(
-                0,
-                0.0,
-                100.0,
-                Color::srgb(1.0, 0.5, 1.0),
-                Color::srgb(1.0, 0.5, 0.0)
-            )
+            SectorBuilder::new(0, 0.0, 30.0, Color::srgb(1.0, 0.5, 1.0), Color::srgb(1.0, 0.5, 0.0))
                 .wall(0.0, 0.0, 100.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
                 .wall(100.0, 0.0, 100.0, 40.0, Color::srgb(0.0, 1.0, 0.0))
                 .portal_with_steps(
@@ -165,8 +159,8 @@ pub fn test_map() -> Map {
 
             SectorBuilder::new(
                 1,
-                0.0,
-                100.0,
+                10.0,
+                30.0,
                 Color::srgb(1.0, 0.5, 1.0),
                 Color::srgb(1.0, 0.5, 0.0)
             )
@@ -185,8 +179,8 @@ pub fn test_map() -> Map {
                 .build(),
             SectorBuilder::new(
                 2,
-                -30.0,
-                100.0,
+                -10.0,
+                30.0,
                 Color::srgb(1.0, 0.5, 1.0),
                 Color::srgb(1.0, 0.5, 0.0)
             )

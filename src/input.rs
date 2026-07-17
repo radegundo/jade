@@ -57,10 +57,10 @@ pub fn input(
         transform.rotate_z(rotation);
 
         if keyboard_input.pressed(KeyCode::KeyK) {
-            view_info.pitch += 1.0;
+            view_info.pitch += 20.0;
         }
         if keyboard_input.pressed(KeyCode::KeyJ) {
-            view_info.pitch -= 1.0;
+            view_info.pitch -= 20.0;
         }
     }
 }

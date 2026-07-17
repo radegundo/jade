@@ -26,6 +26,9 @@ const EYE_OFFSET: f32 = 1.6;
 
 const RAY_COUNT: usize = WINDOW_WIDTH;
 
+const FLOOR_NORMAL: Vec3 = Vec3::new(0.0, 0.0, 1.0);
+const CEILING_NORMAL: Vec3 = Vec3::new(0.0, 0.0, -1.0);
+
 fn main() {
     App::new()
         .add_plugins(
@@ -61,6 +64,11 @@ fn main() {
         .insert_resource(Hits::default())
         .insert_resource(PlayerCameraCache::default())
         .insert_resource(Vclip::full())
+        .insert_resource(Light {
+            direction: Vec3::new(-0.5, -0.5, 0.6).normalize(), // Light from top-left
+            color: Color::WHITE,
+            intensity: 1.5,
+        })
         .run();
 }
 
@@ -85,7 +93,7 @@ impl Default for ViewInfo {
         let view_distance = (WINDOW_WIDTH as f32) / 2.0 / (fov.to_radians() / 2.0).tan();
         let eye_height = 1.8;
         let pitch = 0.0;
-        ViewInfo { fov, max_distance: 500.0, view_distance, eye_height, pitch }
+        ViewInfo { fov, max_distance: 300.0, view_distance, eye_height, pitch }
     }
 }
 
@@ -185,16 +193,12 @@ pub fn test_map() -> Map {
                 .wall(100.0, 60.0, 100.0, 100.0, Color::srgb(0.0, 1.0, 0.0))
                 .wall(100.0, 100.0, 0.0, 100.0, Color::srgb(0.0, 0.0, 1.0))
                 .wall(0.0, 100.0, 0.0, 0.0, Color::srgb(1.0, 1.0, 0.0))
-                .wall(25.0, 25.0, 75.0, 25.0, Color::srgb(0.3, 0.6, 0.3))
-                .wall(75.0, 25.0, 75.0, 75.0, Color::srgb(0.4, 1.0, 0.2))
-                .wall(75.0, 75.0, 25.0, 75.0, Color::srgb(1.0, 0.2, 0.6))
-                .wall(25.0, 75.0, 25.0, 25.0, Color::srgb(0.4, 0.3, 0.6))
                 .build(),
 
             SectorBuilder::new(
                 1,
                 10.0,
-                30.0,
+                20.0,
                 Color::srgb(1.0, 0.5, 1.0),
                 Color::srgb(1.0, 0.5, 0.0)
             )
@@ -240,13 +244,14 @@ pub fn test_map() -> Map {
                     Some(Color::srgb(1.0, 0.0, 0.0)),
                     Some(Color::srgb(1.0, 1.0, 1.0))
                 )
+                .build(),
+            SectorBuilder::new(0, 5.0, 25.0, Color::srgb(1.0, 0.5, 1.0), Color::srgb(1.0, 0.0, 0.0))
+                .wall(25.0, 25.0, 75.0, 25.0, Color::srgb(0.3, 0.6, 0.3))
+                .wall(75.0, 25.0, 75.0, 75.0, Color::srgb(0.4, 1.0, 0.2))
+                .wall(75.0, 75.0, 25.0, 75.0, Color::srgb(1.0, 0.2, 0.6))
+                .wall(25.0, 75.0, 25.0, 25.0, Color::srgb(0.4, 0.3, 0.6))
                 .build()
-            // SectorBuilder::new(4, 0.0, 15.0, Color::srgb(1.0, 0.3, 0.1), Color::srgb(0.4, 0.2, 0.6))
-            //     .wall(25.0, 25.0, 75.0, 25.0, Color::srgb(0.3, 0.6, 0.3))
-            //     .wall(75.0, 25.0, 75.0, 75.0, Color::srgb(0.4, 1.0, 0.2))
-            //     .wall(75.0, 75.0, 25.0, 75.0, Color::srgb(1.0, 0.2, 0.6))
-            //     .wall(25.0, 75.0, 25.0, 25.0, Color::srgb(0.4, 0.3, 0.6))
-            //     .build()
         ],
+        obstacle_sectors: vec![],
     }
 }

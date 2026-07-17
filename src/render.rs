@@ -3,12 +3,20 @@ use bevy::prelude::*;
 use crate::*;
 use ray::*;
 
+#[derive(Resource)]
+pub struct Light {
+    pub direction: Vec3,
+    pub color: Color,
+    pub intensity: f32,
+}
+
 pub fn render(
     mut gizmos: Gizmos,
     mut hits: ResMut<Hits>,
     view_info: Res<ViewInfo>,
     player_cache: Res<PlayerCameraCache>,
     map: Res<Map>,
+    light: Res<Light>,
     mut clip: ResMut<Vclip>
 ) {
     let player_pos = player_cache.transform.translation.truncate();
@@ -31,6 +39,7 @@ pub fn render(
                 clip.0[i],
                 &view_info,
                 &mut gizmos,
+                &light,
                 &map
             );
         }
@@ -79,6 +88,7 @@ pub fn render_column(
     mut clip: VBounds,
     view_info: &ViewInfo,
     gizmos: &mut Gizmos,
+    light: &Light,
     map: &Map
 ) {
     let x = hit_to_screen_x(view_info, index);
@@ -95,21 +105,60 @@ pub fn render_column(
 
     match &hit.line_def.back_side_def {
         None => {
-            // Solid wall —> draw within the clip window, then stop.
-            gizmos.line_2d(
-                Vec2::new(x, wall_top_screen),
-                Vec2::new(x, wall_bottom_screen),
-                hit.line_def.front_side_def.middle_texture.unwrap_or_default()
+            let color = shade_color_directional(
+                hit.line_def.front_side_def.middle_texture.unwrap(),
+                wall_normal(&hit.line_def),
+                total_dist,
+                &view_info,
+                light
             );
+            // Solid wall —> draw within the clip window, then stop.
+            gizmos.line_2d(Vec2::new(x, wall_top_screen), Vec2::new(x, wall_bottom_screen), color);
 
-            draw_floor(x, wall_bottom_screen, clip.bottom, sector.floor_texture, gizmos);
-            draw_ceiling(x, wall_top_screen, clip.top, sector.ceiling_texture, gizmos);
+            draw_floor(
+                x,
+                wall_bottom_screen,
+                clip.bottom,
+                sector.floor_texture,
+                total_dist,
+                &view_info,
+                &light,
+                gizmos
+            );
+            draw_ceiling(
+                x,
+                wall_top_screen,
+                clip.top,
+                sector.ceiling_texture,
+                total_dist,
+                &view_info,
+                &light,
+                gizmos
+            );
         }
         Some(back) => {
             let back_sector = &map.sectors[back.sector];
 
-            draw_floor(x, wall_bottom_screen, clip.bottom, sector.floor_texture, gizmos);
-            draw_ceiling(x, wall_top_screen, clip.top, sector.ceiling_texture, gizmos);
+            draw_floor(
+                x,
+                wall_bottom_screen,
+                clip.bottom,
+                sector.floor_texture,
+                total_dist,
+                &view_info,
+                &light,
+                gizmos
+            );
+            draw_ceiling(
+                x,
+                wall_top_screen,
+                clip.top,
+                sector.ceiling_texture,
+                total_dist,
+                &view_info,
+                &light,
+                gizmos
+            );
 
             // Upper step (lowered ceiling ahead)
             if back_sector.ceiling_height < sector.ceiling_height {
@@ -119,6 +168,13 @@ pub fn render_column(
                     view_info
                 ).clamp(clip.bottom, clip.top);
                 if let Some(color) = hit.line_def.front_side_def.upper_texture {
+                    let color = shade_color_directional(
+                        color,
+                        wall_normal(&hit.line_def),
+                        total_dist,
+                        view_info,
+                        light
+                    );
                     gizmos.line_2d(
                         Vec2::new(x, wall_top_screen),
                         Vec2::new(x, upper_bottom),
@@ -136,6 +192,13 @@ pub fn render_column(
                     view_info
                 ).clamp(clip.bottom, clip.top);
                 if let Some(color) = hit.line_def.front_side_def.lower_texture {
+                    let color = shade_color_directional(
+                        color,
+                        wall_normal(&hit.line_def),
+                        total_dist,
+                        view_info,
+                        light
+                    );
                     gizmos.line_2d(
                         Vec2::new(x, lower_top),
                         Vec2::new(x, wall_bottom_screen),
@@ -185,6 +248,7 @@ pub fn render_column(
                     clip,
                     view_info,
                     gizmos,
+                    &light,
                     map
                 );
             }
@@ -192,14 +256,69 @@ pub fn render_column(
     }
 }
 
-fn draw_floor(x: f32, wall_bottom: f32, clip_bottom: f32, color: Color, gizmos: &mut Gizmos) {
+fn draw_floor(
+    x: f32,
+    wall_bottom: f32,
+    clip_bottom: f32,
+    base_color: Color,
+    dist: f32,
+    view_info: &ViewInfo,
+    light: &Light,
+    gizmos: &mut Gizmos
+) {
     if wall_bottom > clip_bottom {
+        let color = shade_color_directional(base_color, FLOOR_NORMAL, dist, view_info, light);
         gizmos.line_2d(Vec2::new(x, wall_bottom), Vec2::new(x, clip_bottom), color);
     }
 }
 
-fn draw_ceiling(x: f32, wall_top: f32, clip_top: f32, color: Color, gizmos: &mut Gizmos) {
+fn draw_ceiling(
+    x: f32,
+    wall_top: f32,
+    clip_top: f32,
+    base_color: Color,
+    dist: f32,
+    view_info: &ViewInfo,
+    light: &Light,
+    gizmos: &mut Gizmos
+) {
     if wall_top < clip_top {
+        let color = shade_color_directional(base_color, CEILING_NORMAL, dist, view_info, light);
         gizmos.line_2d(Vec2::new(x, wall_top), Vec2::new(x, clip_top), color);
     }
+}
+
+pub fn shade_color_directional(
+    color: Color,
+    normal: Vec3,
+    dist: f32,
+    view_info: &ViewInfo,
+    light: &Light
+) -> Color {
+    let light_dir = light.direction.normalize();
+    let ndotl = normal.normalize().dot(-light_dir).max(0.0);
+
+    let ambient = 0.5;
+    let diffuse = ndotl * light.intensity;
+    let directional_brightness = (ambient + diffuse).min(1.0);
+
+    let max_dist = view_info.max_distance;
+    let t = (dist / max_dist).clamp(0.0, 1.0);
+    let dist_falloff = 1.0 - t * 0.7;
+
+    let brightness = directional_brightness * dist_falloff;
+
+    let srgba = color.to_srgba();
+    let light_srgba = light.color.to_srgba();
+    Color::srgba(
+        srgba.red * brightness * light_srgba.red,
+        srgba.green * brightness * light_srgba.green,
+        srgba.blue * brightness * light_srgba.blue,
+        srgba.alpha
+    )
+}
+
+pub fn wall_normal(line_def: &LineDef) -> Vec3 {
+    let dir = (line_def.end - line_def.start).normalize();
+    Vec2::new(dir.y, -dir.x).extend(0.0)
 }

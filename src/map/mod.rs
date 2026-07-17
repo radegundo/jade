@@ -19,6 +19,7 @@ pub struct Sector {
 #[derive(Resource)]
 pub struct Map {
     pub sectors: Vec<Sector>,
+    pub obstacle_sectors: Vec<Sector>,
 }
 
 #[derive(Default, Clone)]

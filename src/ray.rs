@@ -125,3 +125,37 @@ pub fn hit_to_screen_x(view_info: &ViewInfo, ray_index: usize) -> f32 {
 // pub fn perpendicular_distance(ray_hit_distance: f32, ray_offset: f32) -> f32 {
 //     ray_hit_distance * ray_offset.cos()
 // }
+
+pub fn shade_color_directional(
+    color: Color,
+    normal: Vec3,
+    dist: f32,
+    view_info: &ViewInfo,
+    light: &Light
+) -> Color {
+    let light_dir = light.direction.normalize();
+    let ndotl = normal.normalize().dot(-light_dir).max(0.0);
+
+    let ambient = 0.15;
+    let diffuse = ndotl * light.intensity;
+    let directional_brightness = (ambient + diffuse).min(1.0);
+
+    let max_dist = view_info.max_distance;
+    let t = (dist / max_dist).clamp(0.0, 1.0);
+    let dist_falloff = 1.0 - t * 0.7;
+
+    let brightness = directional_brightness * dist_falloff;
+
+    let srgba = color.to_srgba();
+    let light_srgba = light.color.to_srgba();
+    Color::srgba(
+        srgba.red * brightness * light_srgba.red,
+        srgba.green * brightness * light_srgba.green,
+        srgba.blue * brightness * light_srgba.blue,
+        srgba.alpha
+    )
+}
+pub fn wall_normal(line_def: &LineDef) -> Vec3 {
+    let dir = (line_def.end - line_def.start).normalize();
+    Vec2::new(dir.y, -dir.x).extend(0.0)
+}

@@ -244,12 +244,6 @@ pub fn test_map() -> Map {
                     Some(Color::srgb(1.0, 0.0, 0.0)),
                     Some(Color::srgb(1.0, 1.0, 1.0))
                 )
-                .build(),
-            SectorBuilder::new(0, 5.0, 25.0, Color::srgb(1.0, 0.5, 1.0), Color::srgb(1.0, 0.0, 0.0))
-                .wall(25.0, 25.0, 75.0, 25.0, Color::srgb(0.3, 0.6, 0.3))
-                .wall(75.0, 25.0, 75.0, 75.0, Color::srgb(0.4, 1.0, 0.2))
-                .wall(75.0, 75.0, 25.0, 75.0, Color::srgb(1.0, 0.2, 0.6))
-                .wall(25.0, 75.0, 25.0, 25.0, Color::srgb(0.4, 0.3, 0.6))
                 .build()
         ],
         obstacle_sectors: vec![],

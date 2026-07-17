@@ -298,7 +298,7 @@ pub fn shade_color_directional(
     let light_dir = light.direction.normalize();
     let ndotl = normal.normalize().dot(-light_dir).max(0.0);
 
-    let ambient = 0.5;
+    let ambient = 0.8;
     let diffuse = ndotl * light.intensity;
     let directional_brightness = (ambient + diffuse).min(1.0);
 

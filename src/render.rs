@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use crate::*;
 use ray::*;
+use map::*;
 
 #[derive(Resource)]
 pub struct Light {
@@ -21,7 +22,7 @@ pub fn render(
 ) {
     let player_pos = player_cache.transform.translation.truncate();
     if let Some(i) = find_player_sector(player_pos, &map) {
-        get_sector_hits(&player_cache, &mut hits, &map.sectors[i], &view_info);
+        get_sector_hits(&player_cache, &mut hits, i, &map, &view_info);
     } else {
         for hit in hits.hits.iter_mut() {
             *hit = None;
@@ -92,19 +93,25 @@ pub fn render_column(
     map: &Map
 ) {
     let x = hit_to_screen_x(view_info, index);
-    let sector = &map.sectors[hit.sector_id];
-
-    let wall_top_screen = project_height(sector.ceiling_height, total_dist, view_info).clamp(
-        clip.bottom,
-        clip.top
-    );
-    let wall_bottom_screen = project_height(sector.floor_height, total_dist, view_info).clamp(
-        clip.bottom,
-        clip.top
-    );
+    let sector = if let SectorType::ObstacleSector = hit.sector_type {
+        &map.obstacle_sectors[hit.sector_id]
+    } else {
+        &map.sectors[hit.sector_id]
+    };
 
     match &hit.line_def.back_side_def {
         None => {
+            let wall_top_screen = project_height(
+                sector.ceiling_height,
+                total_dist,
+                view_info
+            ).clamp(clip.bottom, clip.top);
+            let wall_bottom_screen = project_height(
+                sector.floor_height,
+                total_dist,
+                view_info
+            ).clamp(clip.bottom, clip.top);
+
             let color = shade_color_directional(
                 hit.line_def.front_side_def.middle_texture.unwrap(),
                 wall_normal(&hit.line_def),
@@ -137,6 +144,17 @@ pub fn render_column(
             );
         }
         Some(back) => {
+            let wall_top_screen = project_height(
+                sector.ceiling_height,
+                total_dist,
+                view_info
+            ).clamp(clip.bottom, clip.top);
+            let wall_bottom_screen = project_height(
+                sector.floor_height,
+                total_dist,
+                view_info
+            ).clamp(clip.bottom, clip.top);
+
             let back_sector = &map.sectors[back.sector];
 
             draw_floor(
@@ -235,7 +253,8 @@ pub fn render_column(
                 let Some(next_hit) = get_single_hit(
                     &nudged_transform,
                     view_info,
-                    back_sector,
+                    back.sector,
+                    &map,
                     index
                 )
             {

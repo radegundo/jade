@@ -61,7 +61,7 @@ fn main() {
         //RESOURCES
         .insert_resource(ViewInfo::default())
         .insert_resource(test_map())
-        .insert_resource(Hits::default())
+        .insert_resource(Hits::no_hits())
         .insert_resource(PlayerCameraCache::default())
         .insert_resource(Vclip::full())
         .insert_resource(Light {
@@ -178,7 +178,14 @@ fn sync_player_camera(
 pub fn test_map() -> Map {
     Map {
         sectors: vec![
-            SectorBuilder::new(0, 0.0, 25.0, Color::srgb(1.0, 0.5, 1.0), Color::srgb(1.0, 0.0, 0.0))
+            SectorBuilder::new(
+                0,
+                0.0,
+                25.0,
+                Color::srgb(1.0, 0.5, 1.0),
+                Color::srgb(1.0, 0.0, 0.0),
+                Some(vec![0])
+            )
                 .wall(0.0, 0.0, 100.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
                 .wall(100.0, 0.0, 100.0, 40.0, Color::srgb(0.0, 1.0, 0.0))
                 .portal_with_steps(
@@ -200,7 +207,8 @@ pub fn test_map() -> Map {
                 10.0,
                 20.0,
                 Color::srgb(1.0, 0.5, 1.0),
-                Color::srgb(1.0, 0.5, 0.0)
+                Color::srgb(1.0, 0.5, 0.0),
+                None
             )
                 .wall(100.0, 40.0, 150.0, 40.0, Color::srgb(0.5, 0.5, 0.5))
                 .portal_with_steps(
@@ -228,7 +236,8 @@ pub fn test_map() -> Map {
                 -10.0,
                 25.0,
                 Color::srgb(1.0, 0.5, 1.0),
-                Color::srgb(1.0, 0.0, 0.0)
+                Color::srgb(1.0, 0.0, 0.0),
+                None
             )
                 .wall(150.0, 40.0, 150.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
                 .wall(150.0, 0.0, 250.0, 0.0, Color::srgb(1.0, 0.5, 0.0))
@@ -246,6 +255,19 @@ pub fn test_map() -> Map {
                 )
                 .build()
         ],
-        obstacle_sectors: vec![],
+        obstacle_sectors: vec![
+            ObstacleSectorBuilder::new(
+                0,
+                0.0,
+                5.0,
+                Color::srgb(1.0, 0.0, 0.0),
+                Color::srgb(0.0, 1.0, 1.0)
+            )
+                .wall(10.0, 10.0, 20.0, 10.0, Color::srgb(0.0, 1.0, 0.0))
+                .wall(20.0, 10.0, 20.0, 20.0, Color::srgb(1.0, 0.0, 0.0))
+                .wall(20.0, 20.0, 10.0, 20.0, Color::srgb(1.0, 1.0, 0.0))
+                .wall(10.0, 20.0, 10.0, 10.0, Color::srgb(1.0, 0.0, 0.0))
+                .build()
+        ],
     }
 }

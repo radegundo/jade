@@ -14,6 +14,13 @@ pub struct Sector {
     pub id: usize,
     pub floor_texture: Color,
     pub ceiling_texture: Color,
+    pub sector_type: SectorType,
+    pub obstacle_ids: Option<Vec<usize>>,
+}
+
+pub enum SectorType {
+    Sector,
+    ObstacleSector,
 }
 
 #[derive(Resource)]
@@ -149,7 +156,7 @@ pub fn rect_sector(
     floor_color: Color,
     ceiling_color: Color
 ) -> Sector {
-    SectorBuilder::new(self_index, floor_height, ceiling_height, floor_color, ceiling_color)
+    SectorBuilder::new(self_index, floor_height, ceiling_height, floor_color, ceiling_color, None)
         .wall(min.x, min.y, max.x, min.y, wall_color)
         .wall(max.x, min.y, max.x, max.y, wall_color)
         .wall(max.x, max.y, min.x, max.y, wall_color)
@@ -165,6 +172,7 @@ pub struct SectorBuilder {
     self_index: usize,
     floor_texture: Color,
     ceiling_texture: Color,
+    obstacle_ids: Option<Vec<usize>>,
 }
 
 impl SectorBuilder {
@@ -173,7 +181,8 @@ impl SectorBuilder {
         floor_height: f32,
         ceiling_height: f32,
         floor_texture: Color,
-        ceiling_texture: Color
+        ceiling_texture: Color,
+        obstacle_ids: Option<Vec<usize>>
     ) -> Self {
         SectorBuilder {
             walls: Vec::new(),
@@ -182,6 +191,7 @@ impl SectorBuilder {
             self_index,
             floor_texture,
             ceiling_texture,
+            obstacle_ids,
         }
     }
 
@@ -233,6 +243,56 @@ impl SectorBuilder {
             id: self.self_index,
             floor_texture: self.floor_texture,
             ceiling_texture: self.ceiling_texture,
+            sector_type: SectorType::Sector,
+            obstacle_ids: self.obstacle_ids,
+        }
+    }
+}
+
+pub struct ObstacleSectorBuilder {
+    walls: Vec<LineDef>,
+    floor_height: f32,
+    ceiling_height: f32,
+    self_index: usize,
+    floor_texture: Color,
+    ceiling_texture: Color,
+}
+
+impl ObstacleSectorBuilder {
+    pub fn new(
+        self_index: usize,
+        floor_height: f32,
+        ceiling_height: f32,
+        floor_texture: Color,
+        ceiling_texture: Color
+    ) -> Self {
+        ObstacleSectorBuilder {
+            walls: Vec::new(),
+            floor_height,
+            ceiling_height,
+            self_index,
+            floor_texture,
+            ceiling_texture,
+        }
+    }
+    /// Add a solid wall.
+    pub fn wall(mut self, x0: f32, y0: f32, x1: f32, y1: f32, color: Color) -> Self {
+        let mut wall = solid_wall(x0, y0, x1, y1, color);
+        wall.front_side_def.sector = self.self_index;
+        self.walls.push(wall);
+        self
+    }
+
+    pub fn build(self) -> Sector {
+        Sector {
+            walls: self.walls,
+            floor_height: self.floor_height,
+            ceiling_height: self.ceiling_height,
+            id: self.self_index,
+            floor_texture: self.floor_texture,
+            ceiling_texture: self.ceiling_texture,
+            sector_type: SectorType::ObstacleSector,
+            obstacle_ids: None,
         }
     }
 }

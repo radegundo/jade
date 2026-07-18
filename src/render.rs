@@ -112,6 +112,74 @@ pub fn render_column(
                 view_info
             ).clamp(clip.bottom, clip.top);
 
+            if let SectorType::ObstacleSector = hit.sector_type {
+                // --- Draw the obstacle's front face ---
+                let color = shade_color_directional(
+                    hit.line_def.front_side_def.middle_texture.unwrap(),
+                    wall_normal(&hit.line_def),
+                    total_dist,
+                    view_info,
+                    light
+                );
+                let room = &map.sectors[hit.room_sector_id]; // the containing room
+                gizmos.line_2d(
+                    Vec2::new(x, wall_top_screen),
+                    Vec2::new(x, wall_bottom_screen),
+                    color
+                );
+
+                // --- Shrink clip around the obstacle's screen footprint ---
+                let mut behind_clip = clip;
+                behind_clip.bottom = wall_top_screen; // nothing behind can draw below the obstacle's top
+                // (if the obstacle doesn't reach the floor, you'd also clip.top = wall_bottom_screen
+                //  for a second segment below it — skipping that for now assuming floor-to-top boxes)
+
+                // --- Continue the SAME ray, in the room sector the obstacle sits in, past it ---
+                let angle = get_ray_angle(index, &player_cache.transform, view_info);
+                let dir = Vec2::new(angle.cos(), angle.sin());
+                let nudged_origin = hit.pos + dir * 0.05;
+                let mut nudged_transform = player_cache.transform.clone();
+                nudged_transform.translation = nudged_origin.extend(0.0);
+
+                // Note: pass the room's sector_index the obstacle belongs to, not hit.sector_id
+                // (hit.sector_id is the obstacle's own index — you need the containing room's index here)
+                if
+                    let Some(next_hit) = get_single_hit(
+                        &nudged_transform,
+                        view_info,
+                        sector.id, // see note below — you need this on WallHit
+                        map,
+                        index
+                    )
+                {
+                    let next_total_dist = total_dist + next_hit.perp_dist;
+                    render_column(
+                        index,
+                        player_cache,
+                        next_total_dist,
+                        &next_hit,
+                        behind_clip,
+                        view_info,
+                        gizmos,
+                        light,
+                        map
+                    );
+                }
+
+                draw_floor(
+                    x,
+                    wall_bottom_screen,
+                    clip.bottom,
+                    room.floor_texture,
+                    total_dist,
+                    view_info,
+                    light,
+                    gizmos
+                );
+                // no draw_ceiling here yet — see top-face section below
+                return; // don't fall through to normal solid-wall floor/ceiling draw
+            }
+
             let color = shade_color_directional(
                 hit.line_def.front_side_def.middle_texture.unwrap(),
                 wall_normal(&hit.line_def),

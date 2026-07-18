@@ -13,6 +13,7 @@ pub struct WallHit {
     pub pos: Vec2,
     pub perp_dist: f32,
     pub sector_id: usize,
+    pub room_sector_id: usize,
     pub line_def: LineDef,
     pub sector_type: SectorType,
 }
@@ -190,6 +191,7 @@ pub fn get_single_hit(
             pos,
             perp_dist,
             sector_id: id, // now correct for both cases
+            room_sector_id: sector_index,
             line_def,
             sector_type,
         }

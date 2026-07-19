@@ -3,3 +3,4 @@
 *.pdb
 pull-jade.sh
 *sync*
+/.continue

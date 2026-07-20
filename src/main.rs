@@ -178,123 +178,105 @@ fn sync_player_camera(
         cache.transform = *transform;
     }
 }
-// pub fn test_map() -> Map {
-//     Map {
-//         sectors: vec![
-//             SectorBuilder::new(
-//                 0,
-//                 0.0,
-//                 25.0,
-//                 Color::srgb(1.0, 0.5, 1.0),
-//                 Color::srgb(1.0, 0.0, 0.0),
-//                 Some(vec![0])
-//             )
-//                 .wall(0.0, 0.0, 100.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
-//                 .wall(100.0, 0.0, 100.0, 40.0, Color::srgb(0.0, 1.0, 0.0))
-//                 .portal_with_steps(
-//                     100.0,
-//                     40.0,
-//                     100.0,
-//                     60.0,
-//                     1,
-//                     Some(Color::srgb(1.0, 1.0, 1.0)),
-//                     Some(Color::srgb(1.0, 1.0, 1.0))
-//                 ) // back_sector only — front is auto = 0
-//                 .wall(100.0, 60.0, 100.0, 100.0, Color::srgb(0.0, 1.0, 0.0))
-//                 .wall(100.0, 100.0, 0.0, 100.0, Color::srgb(0.0, 0.0, 1.0))
-//                 .wall(0.0, 100.0, 0.0, 0.0, Color::srgb(1.0, 1.0, 0.0))
-//                 .build(),
-
-//             SectorBuilder::new(
-//                 1,
-//                 10.0,
-//                 20.0,
-//                 Color::srgb(1.0, 0.5, 1.0),
-//                 Color::srgb(1.0, 0.5, 0.0),
-//                 None
-//             )
-//                 .wall(100.0, 40.0, 150.0, 40.0, Color::srgb(0.5, 0.5, 0.5))
-//                 .portal_with_steps(
-//                     150.0,
-//                     40.0,
-//                     150.0,
-//                     60.0,
-//                     2,
-//                     Some(Color::srgb(1.0, 0.0, 0.5)),
-//                     Some(Color::srgb(1.0, 0.0, 0.5))
-//                 )
-//                 .wall(150.0, 60.0, 100.0, 60.0, Color::srgb(0.5, 0.5, 0.5))
-//                 .portal_with_steps(
-//                     100.0,
-//                     60.0,
-//                     100.0,
-//                     40.0,
-//                     0,
-//                     Some(Color::srgb(1.0, 1.0, 0.0)),
-//                     Some(Color::srgb(1.0, 1.0, 1.0))
-//                 )
-//                 .build(),
-//             SectorBuilder::new(
-//                 2,
-//                 -10.0,
-//                 25.0,
-//                 Color::srgb(1.0, 0.5, 1.0),
-//                 Color::srgb(1.0, 0.0, 0.0),
-//                 None
-//             )
-//                 .wall(150.0, 40.0, 150.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
-//                 .wall(150.0, 0.0, 250.0, 0.0, Color::srgb(1.0, 0.5, 0.0))
-//                 .wall(250.0, 0.0, 250.0, 100.0, Color::srgb(0.7, 0.5, 0.0))
-//                 .wall(250.0, 100.0, 150.0, 100.0, Color::srgb(0.7, 0.5, 1.0))
-//                 .wall(150.0, 100.0, 150.0, 60.0, Color::srgb(0.7, 0.5, 1.0))
-//                 .portal_with_steps(
-//                     150.0,
-//                     60.0,
-//                     150.0,
-//                     40.0,
-//                     1,
-//                     Some(Color::srgb(1.0, 0.0, 0.0)),
-//                     Some(Color::srgb(1.0, 1.0, 1.0))
-//                 )
-//                 .build()
-//         ],
-//         obstacle_sectors: vec![
-//             ObstacleSectorBuilder::new(
-//                 0,
-//                 0.0,
-//                 5.0,
-//                 Color::srgb(1.0, 0.0, 0.0),
-//                 Color::srgb(0.0, 1.0, 1.0)
-//             )
-//                 .wall(10.0, 10.0, 20.0, 10.0, Color::srgb(0.0, 1.0, 0.0))
-//                 .wall(20.0, 10.0, 20.0, 20.0, Color::srgb(1.0, 0.0, 0.0))
-//                 .wall(20.0, 20.0, 10.0, 20.0, Color::srgb(1.0, 1.0, 0.0))
-//                 .wall(10.0, 20.0, 10.0, 10.0, Color::srgb(1.0, 0.0, 0.0))
-//                 .build()
-//         ],
-//     }
-// }
-
-fn test_map(asset_server: Res<AssetServer>) -> Map {
-    let wall_texture = asset_server.load("texture.png");
-    let floor_texture = asset_server.load("texture.png");
-    let ceiling_texture = asset_server.load("texture.png");
+pub fn test_map(asset_server: Res<AssetServer>) -> Map {
+    let texture = asset_server.load("texture.png");
+    let floor_texture = asset_server.load("floor_texture.png");
     Map {
         sectors: vec![
-            rect_sector(
+            SectorBuilder::new(
                 0,
-                Vec2::new(0.0, 0.0),
-                Vec2::new(100.0, 100.0),
                 0.0,
-                10.0,
-                wall_texture,
-                floor_texture,
-                ceiling_texture
+                25.0,
+                floor_texture.clone(),
+                floor_texture.clone(),
+                Some(vec![0])
             )
+                .wall(0.0, 0.0, 100.0, 0.0, texture.clone())
+                .wall(100.0, 0.0, 100.0, 40.0, texture.clone())
+                .portal_with_steps(
+                    100.0,
+                    40.0,
+                    100.0,
+                    60.0,
+                    1,
+                    Some(texture.clone()),
+                    Some(texture.clone())
+                ) // back_sector only — front is auto = 0
+                .wall(100.0, 60.0, 100.0, 100.0, texture.clone())
+                .wall(100.0, 100.0, 0.0, 100.0, texture.clone())
+                .wall(0.0, 100.0, 0.0, 0.0, texture.clone())
+                .build(),
+
+            SectorBuilder::new(1, 10.0, 20.0, floor_texture.clone(), floor_texture.clone(), None)
+                .wall(100.0, 40.0, 150.0, 40.0, texture.clone())
+                .portal_with_steps(
+                    150.0,
+                    40.0,
+                    150.0,
+                    60.0,
+                    2,
+                    Some(texture.clone()),
+                    Some(texture.clone())
+                )
+                .wall(150.0, 60.0, 100.0, 60.0, texture.clone())
+                .portal_with_steps(
+                    100.0,
+                    60.0,
+                    100.0,
+                    40.0,
+                    0,
+                    Some(texture.clone()),
+                    Some(texture.clone())
+                )
+                .build(),
+            SectorBuilder::new(2, -10.0, 25.0, floor_texture.clone(), floor_texture.clone(), None)
+                .wall(150.0, 40.0, 150.0, 0.0, texture.clone())
+                .wall(150.0, 0.0, 250.0, 0.0, texture.clone())
+                .wall(250.0, 0.0, 250.0, 100.0, texture.clone())
+                .wall(250.0, 100.0, 150.0, 100.0, texture.clone())
+                .wall(150.0, 100.0, 150.0, 60.0, texture.clone())
+                .portal_with_steps(
+                    150.0,
+                    60.0,
+                    150.0,
+                    40.0,
+                    1,
+                    Some(texture.clone()),
+                    Some(texture.clone())
+                )
+                .build()
         ],
-        obstacle_sectors: vec![],
+        obstacle_sectors: vec![
+            ObstacleSectorBuilder::new(0, 0.0, 5.0, floor_texture.clone(), floor_texture.clone())
+                .wall(10.0, 10.0, 20.0, 10.0, texture.clone())
+                .wall(20.0, 10.0, 20.0, 20.0, texture.clone())
+                .wall(20.0, 20.0, 10.0, 20.0, texture.clone())
+                .wall(10.0, 20.0, 10.0, 10.0, texture)
+                .build()
+        ],
     }
 }
+
+// fn test_map(asset_server: Res<AssetServer>) -> Map {
+//     let wall_texture = asset_server.load("texture.png");
+//     let floor_texture = asset_server.load("texture.png");
+//     let ceiling_texture = asset_server.load("texture.png");
+//     Map {
+//         sectors: vec![
+//             rect_sector(
+//                 0,
+//                 Vec2::new(0.0, 0.0),
+//                 Vec2::new(100.0, 100.0),
+//                 0.0,
+//                 10.0,
+//                 wall_texture,
+//                 floor_texture,
+//                 ceiling_texture
+//             )
+//         ],
+//         obstacle_sectors: vec![],
+//     }
+// }
 
 fn setup_map(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(test_map(asset_server));

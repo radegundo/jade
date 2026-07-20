@@ -84,59 +84,6 @@ pub fn get_sector_hits(
     }
 }
 
-// pub fn get_single_hit(
-//     transform: &Transform,
-//     view_info: &ViewInfo,
-//     sector_index: usize,
-//     map: &Map,
-//     index: usize
-// ) -> Option<WallHit> {
-//     let origin = transform.translation.truncate();
-//     let angle = get_ray_angle(index, &transform, view_info);
-//     let offset = get_ray_offset(index, view_info); // needed for fisheye correction
-//     let start = transform.translation;
-//     let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * view_info.max_distance;
-//     let ray = Ray { start: start.truncate(), sec_point: end.truncate() };
-
-//     let mut nearest_hit: Option<(Vec2, LineDef, SectorType)> = None;
-//     let mut nearest_dist_sq = f32::MAX;
-
-//     for wall in &map.sectors[sector_index].walls {
-//         if let Some(hit) = ray_hit(&ray, wall) {
-//             let dist_sq = origin.distance_squared(hit);
-//             if dist_sq < nearest_dist_sq {
-//                 nearest_dist_sq = dist_sq;
-//                 nearest_hit = Some((hit, wall.clone(), SectorType::ObstacleSector));
-//             }
-//         }
-//     }
-//     if let Some(obstacle_ids) = &map.sectors[sector_index].obstacle_ids {
-//         for obstacle in obstacle_ids {
-//             for wall in &map.obstacle_sectors[*obstacle].walls {
-//                 if let Some(hit) = ray_hit(&ray, wall) {
-//                     let dist_sq = origin.distance_squared(hit);
-//                     if dist_sq < nearest_dist_sq {
-//                         nearest_dist_sq = dist_sq;
-//                         nearest_hit = Some((hit, wall.clone(), SectorType::Sector));
-//                     }
-//                 }
-//             }
-//         }
-//     }
-//     if let Some(hit) = nearest_hit {
-//         let raw_dist = nearest_dist_sq.sqrt(); // straight-line distance
-//         let perp_dist = raw_dist * offset.cos(); // fisheye-corrected
-//         Some(WallHit {
-//             pos: hit.0,
-//             perp_dist: perp_dist,
-//             line_def: hit.1.clone(),
-//             sector_id: hit.1.front_side_def.sector,
-//             sector_type: hit.2,
-//         })
-//     } else {
-//         None
-//     }
-// }
 pub fn get_single_hit(
     transform: &Transform,
     view_info: &ViewInfo,
@@ -165,24 +112,25 @@ pub fn get_single_hit(
         }
     }
 
-    if let Some(obstacle_ids) = &map.sectors[sector_index].obstacle_ids {
-        for &obstacle_id in obstacle_ids {
-            for wall in &map.obstacle_sectors[obstacle_id].walls {
-                if let Some(hit) = ray_hit(&ray, wall) {
-                    let dist_sq = origin.distance_squared(hit);
-                    if dist_sq < nearest_dist_sq {
-                        nearest_dist_sq = dist_sq;
-                        nearest_hit = Some((
-                            hit,
-                            wall.clone(),
-                            SectorType::ObstacleSector,
-                            obstacle_id,
-                        ));
-                    }
-                }
-            }
-        }
-    }
+    // OBSTACLE CODE FOR LATER
+    // if let Some(obstacle_ids) = &map.sectors[sector_index].obstacle_ids {
+    //     for &obstacle_id in obstacle_ids {
+    //         for wall in &map.obstacle_sectors[obstacle_id].walls {
+    //             if let Some(hit) = ray_hit(&ray, wall) {
+    //                 let dist_sq = origin.distance_squared(hit);
+    //                 if dist_sq < nearest_dist_sq {
+    //                     nearest_dist_sq = dist_sq;
+    //                     nearest_hit = Some((
+    //                         hit,
+    //                         wall.clone(),
+    //                         SectorType::ObstacleSector,
+    //                         obstacle_id,
+    //                     ));
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     nearest_hit.map(|(pos, line_def, sector_type, id)| {
         let raw_dist = nearest_dist_sq.sqrt();

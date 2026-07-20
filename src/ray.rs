@@ -165,24 +165,25 @@ pub fn get_single_hit(
         }
     }
 
-    if let Some(obstacle_ids) = &map.sectors[sector_index].obstacle_ids {
-        for &obstacle_id in obstacle_ids {
-            for wall in &map.obstacle_sectors[obstacle_id].walls {
-                if let Some(hit) = ray_hit(&ray, wall) {
-                    let dist_sq = origin.distance_squared(hit);
-                    if dist_sq < nearest_dist_sq {
-                        nearest_dist_sq = dist_sq;
-                        nearest_hit = Some((
-                            hit,
-                            wall.clone(),
-                            SectorType::ObstacleSector,
-                            obstacle_id,
-                        ));
-                    }
-                }
-            }
-        }
-    }
+    // OBSTACLE CODE FOR LATER
+    // if let Some(obstacle_ids) = &map.sectors[sector_index].obstacle_ids {
+    //     for &obstacle_id in obstacle_ids {
+    //         for wall in &map.obstacle_sectors[obstacle_id].walls {
+    //             if let Some(hit) = ray_hit(&ray, wall) {
+    //                 let dist_sq = origin.distance_squared(hit);
+    //                 if dist_sq < nearest_dist_sq {
+    //                     nearest_dist_sq = dist_sq;
+    //                     nearest_hit = Some((
+    //                         hit,
+    //                         wall.clone(),
+    //                         SectorType::ObstacleSector,
+    //                         obstacle_id,
+    //                     ));
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     nearest_hit.map(|(pos, line_def, sector_type, id)| {
         let raw_dist = nearest_dist_sq.sqrt();

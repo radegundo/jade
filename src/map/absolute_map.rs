@@ -19,11 +19,7 @@ impl Plugin for AbsoluteMapPlugin {
 pub fn draw_walls(map: Res<Map>, mut gizmos: Gizmos<MapGizmos>) {
     for sector in &map.sectors {
         for wall in &sector.walls {
-            gizmos.line(
-                wall.start.extend(0.0),
-                wall.end.extend(0.0),
-                wall.front_side_def.middle_texture.unwrap_or_default()
-            );
+            gizmos.line(wall.start.extend(0.0), wall.end.extend(0.0), Color::WHITE);
         }
     }
 }

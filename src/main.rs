@@ -9,6 +9,7 @@ use crate::{
     input::OwnInputPlugin,
     map::{ absolute_map::AbsoluteMapPlugin, relative_map::RelativeMapPlugin, * },
     ray::Hits,
+    sprite::SpritePool,
 };
 use render::*;
 
@@ -16,6 +17,7 @@ mod input;
 mod ray;
 mod map;
 mod render;
+mod sprite;
 
 //Screen width
 //For naming purposes duplicate the constant
@@ -56,11 +58,11 @@ fn main() {
         .add_plugins(RelativeMapPlugin)
         .init_state::<MapViewMode>()
         .init_gizmo_group::<MapGizmos>()
+        .add_systems(Startup, setup_map) // NEW: map now needs AssetServer
         //RENDER
         .add_systems(Update, render)
         //RESOURCES
         .insert_resource(ViewInfo::default())
-        .insert_resource(test_map())
         .insert_resource(Hits::no_hits())
         .insert_resource(PlayerCameraCache::default())
         .insert_resource(Vclip::full())
@@ -69,6 +71,7 @@ fn main() {
             color: Color::WHITE,
             intensity: 1.5,
         })
+        .insert_resource(SpritePool::default())
         .run();
 }
 
@@ -175,99 +178,124 @@ fn sync_player_camera(
         cache.transform = *transform;
     }
 }
-pub fn test_map() -> Map {
+// pub fn test_map() -> Map {
+//     Map {
+//         sectors: vec![
+//             SectorBuilder::new(
+//                 0,
+//                 0.0,
+//                 25.0,
+//                 Color::srgb(1.0, 0.5, 1.0),
+//                 Color::srgb(1.0, 0.0, 0.0),
+//                 Some(vec![0])
+//             )
+//                 .wall(0.0, 0.0, 100.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
+//                 .wall(100.0, 0.0, 100.0, 40.0, Color::srgb(0.0, 1.0, 0.0))
+//                 .portal_with_steps(
+//                     100.0,
+//                     40.0,
+//                     100.0,
+//                     60.0,
+//                     1,
+//                     Some(Color::srgb(1.0, 1.0, 1.0)),
+//                     Some(Color::srgb(1.0, 1.0, 1.0))
+//                 ) // back_sector only — front is auto = 0
+//                 .wall(100.0, 60.0, 100.0, 100.0, Color::srgb(0.0, 1.0, 0.0))
+//                 .wall(100.0, 100.0, 0.0, 100.0, Color::srgb(0.0, 0.0, 1.0))
+//                 .wall(0.0, 100.0, 0.0, 0.0, Color::srgb(1.0, 1.0, 0.0))
+//                 .build(),
+
+//             SectorBuilder::new(
+//                 1,
+//                 10.0,
+//                 20.0,
+//                 Color::srgb(1.0, 0.5, 1.0),
+//                 Color::srgb(1.0, 0.5, 0.0),
+//                 None
+//             )
+//                 .wall(100.0, 40.0, 150.0, 40.0, Color::srgb(0.5, 0.5, 0.5))
+//                 .portal_with_steps(
+//                     150.0,
+//                     40.0,
+//                     150.0,
+//                     60.0,
+//                     2,
+//                     Some(Color::srgb(1.0, 0.0, 0.5)),
+//                     Some(Color::srgb(1.0, 0.0, 0.5))
+//                 )
+//                 .wall(150.0, 60.0, 100.0, 60.0, Color::srgb(0.5, 0.5, 0.5))
+//                 .portal_with_steps(
+//                     100.0,
+//                     60.0,
+//                     100.0,
+//                     40.0,
+//                     0,
+//                     Some(Color::srgb(1.0, 1.0, 0.0)),
+//                     Some(Color::srgb(1.0, 1.0, 1.0))
+//                 )
+//                 .build(),
+//             SectorBuilder::new(
+//                 2,
+//                 -10.0,
+//                 25.0,
+//                 Color::srgb(1.0, 0.5, 1.0),
+//                 Color::srgb(1.0, 0.0, 0.0),
+//                 None
+//             )
+//                 .wall(150.0, 40.0, 150.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
+//                 .wall(150.0, 0.0, 250.0, 0.0, Color::srgb(1.0, 0.5, 0.0))
+//                 .wall(250.0, 0.0, 250.0, 100.0, Color::srgb(0.7, 0.5, 0.0))
+//                 .wall(250.0, 100.0, 150.0, 100.0, Color::srgb(0.7, 0.5, 1.0))
+//                 .wall(150.0, 100.0, 150.0, 60.0, Color::srgb(0.7, 0.5, 1.0))
+//                 .portal_with_steps(
+//                     150.0,
+//                     60.0,
+//                     150.0,
+//                     40.0,
+//                     1,
+//                     Some(Color::srgb(1.0, 0.0, 0.0)),
+//                     Some(Color::srgb(1.0, 1.0, 1.0))
+//                 )
+//                 .build()
+//         ],
+//         obstacle_sectors: vec![
+//             ObstacleSectorBuilder::new(
+//                 0,
+//                 0.0,
+//                 5.0,
+//                 Color::srgb(1.0, 0.0, 0.0),
+//                 Color::srgb(0.0, 1.0, 1.0)
+//             )
+//                 .wall(10.0, 10.0, 20.0, 10.0, Color::srgb(0.0, 1.0, 0.0))
+//                 .wall(20.0, 10.0, 20.0, 20.0, Color::srgb(1.0, 0.0, 0.0))
+//                 .wall(20.0, 20.0, 10.0, 20.0, Color::srgb(1.0, 1.0, 0.0))
+//                 .wall(10.0, 20.0, 10.0, 10.0, Color::srgb(1.0, 0.0, 0.0))
+//                 .build()
+//         ],
+//     }
+// }
+
+fn test_map(asset_server: Res<AssetServer>) -> Map {
+    let wall_texture = asset_server.load("texture.png");
+    let floor_texture = asset_server.load("texture.png");
+    let ceiling_texture = asset_server.load("texture.png");
     Map {
         sectors: vec![
-            SectorBuilder::new(
+            rect_sector(
                 0,
+                Vec2::new(0.0, 0.0),
+                Vec2::new(100.0, 100.0),
                 0.0,
-                25.0,
-                Color::srgb(1.0, 0.5, 1.0),
-                Color::srgb(1.0, 0.0, 0.0),
-                Some(vec![0])
-            )
-                .wall(0.0, 0.0, 100.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
-                .wall(100.0, 0.0, 100.0, 40.0, Color::srgb(0.0, 1.0, 0.0))
-                .portal_with_steps(
-                    100.0,
-                    40.0,
-                    100.0,
-                    60.0,
-                    1,
-                    Some(Color::srgb(1.0, 1.0, 1.0)),
-                    Some(Color::srgb(1.0, 1.0, 1.0))
-                ) // back_sector only — front is auto = 0
-                .wall(100.0, 60.0, 100.0, 100.0, Color::srgb(0.0, 1.0, 0.0))
-                .wall(100.0, 100.0, 0.0, 100.0, Color::srgb(0.0, 0.0, 1.0))
-                .wall(0.0, 100.0, 0.0, 0.0, Color::srgb(1.0, 1.0, 0.0))
-                .build(),
-
-            SectorBuilder::new(
-                1,
                 10.0,
-                20.0,
-                Color::srgb(1.0, 0.5, 1.0),
-                Color::srgb(1.0, 0.5, 0.0),
-                None
+                wall_texture,
+                floor_texture,
+                ceiling_texture
             )
-                .wall(100.0, 40.0, 150.0, 40.0, Color::srgb(0.5, 0.5, 0.5))
-                .portal_with_steps(
-                    150.0,
-                    40.0,
-                    150.0,
-                    60.0,
-                    2,
-                    Some(Color::srgb(1.0, 0.0, 0.5)),
-                    Some(Color::srgb(1.0, 0.0, 0.5))
-                )
-                .wall(150.0, 60.0, 100.0, 60.0, Color::srgb(0.5, 0.5, 0.5))
-                .portal_with_steps(
-                    100.0,
-                    60.0,
-                    100.0,
-                    40.0,
-                    0,
-                    Some(Color::srgb(1.0, 1.0, 0.0)),
-                    Some(Color::srgb(1.0, 1.0, 1.0))
-                )
-                .build(),
-            SectorBuilder::new(
-                2,
-                -10.0,
-                25.0,
-                Color::srgb(1.0, 0.5, 1.0),
-                Color::srgb(1.0, 0.0, 0.0),
-                None
-            )
-                .wall(150.0, 40.0, 150.0, 0.0, Color::srgb(1.0, 0.0, 0.0))
-                .wall(150.0, 0.0, 250.0, 0.0, Color::srgb(1.0, 0.5, 0.0))
-                .wall(250.0, 0.0, 250.0, 100.0, Color::srgb(0.7, 0.5, 0.0))
-                .wall(250.0, 100.0, 150.0, 100.0, Color::srgb(0.7, 0.5, 1.0))
-                .wall(150.0, 100.0, 150.0, 60.0, Color::srgb(0.7, 0.5, 1.0))
-                .portal_with_steps(
-                    150.0,
-                    60.0,
-                    150.0,
-                    40.0,
-                    1,
-                    Some(Color::srgb(1.0, 0.0, 0.0)),
-                    Some(Color::srgb(1.0, 1.0, 1.0))
-                )
-                .build()
         ],
-        obstacle_sectors: vec![
-            ObstacleSectorBuilder::new(
-                0,
-                0.0,
-                5.0,
-                Color::srgb(1.0, 0.0, 0.0),
-                Color::srgb(0.0, 1.0, 1.0)
-            )
-                .wall(10.0, 10.0, 20.0, 10.0, Color::srgb(0.0, 1.0, 0.0))
-                .wall(20.0, 10.0, 20.0, 20.0, Color::srgb(1.0, 0.0, 0.0))
-                .wall(20.0, 20.0, 10.0, 20.0, Color::srgb(1.0, 1.0, 0.0))
-                .wall(10.0, 20.0, 10.0, 10.0, Color::srgb(1.0, 0.0, 0.0))
-                .build()
-        ],
+        obstacle_sectors: vec![],
     }
+}
+
+fn setup_map(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(test_map(asset_server));
 }

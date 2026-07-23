@@ -35,11 +35,7 @@ pub struct LineDef {
     pub end: Vec2,
     pub front_side_def: SideDef,
     pub back_side_def: Option<SideDef>,
-    pub wall_id: WallId,
 }
-
-#[derive(Default, Clone)]
-pub struct WallId(pub f32);
 
 #[derive(Default, Clone)]
 pub struct SideDef {
@@ -70,7 +66,7 @@ pub enum MapViewMode {
 
 impl LineDef {
     /// A solid, one-sided wall (no back sector).
-    pub fn new(x0: f32, y0: f32, x1: f32, y1: f32, texture: Handle<Image>, id: f32) -> Self {
+    pub fn new(x0: f32, y0: f32, x1: f32, y1: f32, texture: Handle<Image>) -> Self {
         let front_side_def = SideDef {
             middle_texture: Some(texture),
             ..default()
@@ -80,7 +76,6 @@ impl LineDef {
             end: Vec2::new(x1, y1),
             front_side_def,
             back_side_def: None,
-            wall_id: WallId(id),
         }
     }
 }

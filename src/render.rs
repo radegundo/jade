@@ -14,49 +14,49 @@ pub struct Light {
     pub intensity: f32,
 }
 
-// pub fn render(
-//     mut commands: Commands,
-//     mut hits: ResMut<Hits>,
-//     view_info: Res<ViewInfo>,
-//     player_cache: Res<PlayerCameraCache>,
-//     map: Res<Map>,
-//     light: Res<Light>,
-//     mut clip: ResMut<Vclip>,
-//     mut pool: ResMut<SpritePool>,
-//     mut sprite_query: Query<(&mut Sprite, &mut Transform, &mut Visibility)>
-// ) {
-//     pool.reset();
+pub fn render(
+    mut commands: Commands,
+    mut hits: ResMut<Hits>,
+    view_info: Res<ViewInfo>,
+    player_cache: Res<PlayerCameraCache>,
+    map: Res<Map>,
+    light: Res<Light>,
+    mut clip: ResMut<Vclip>,
+    mut pool: ResMut<SpritePool>,
+    mut sprite_query: Query<(&mut Sprite, &mut Transform, &mut Visibility)>
+) {
+    pool.reset();
 
-//     let player_pos = player_cache.transform.translation.truncate();
-//     if let Some(i) = find_player_sector(player_pos, &map) {
-//         get_sector_hits(&player_cache, &mut hits, i, &map, &view_info);
-//     } else {
-//         for hit in hits.hits.iter_mut() {
-//             *hit = None;
-//         }
-//     }
+    let player_pos = player_cache.transform.translation.truncate();
+    if let Some(i) = find_player_sector(player_pos, &map) {
+        get_sector_hits(&player_cache, &mut hits, i, &map, &view_info);
+    } else {
+        for hit in hits.hits.iter_mut() {
+            *hit = None;
+        }
+    }
 
-//     for i in 0..RAY_COUNT {
-//         if let Some(hit) = &hits.hits[i] {
-//             clip.0[i] = VBounds::full();
-//             render_wall_column(
-//                 i,
-//                 &player_cache,
-//                 hit.perp_dist,
-//                 hit,
-//                 clip.0[i],
-//                 &view_info,
-//                 &light,
-//                 &map,
-//                 &mut commands,
-//                 &mut pool,
-//                 &mut sprite_query
-//             );
-//         }
-//     }
+    for i in 0..RAY_COUNT {
+        if let Some(hit) = &hits.hits[i] {
+            clip.0[i] = VBounds::full();
+            render_wall_column(
+                i,
+                &player_cache,
+                hit.perp_dist,
+                hit,
+                clip.0[i],
+                &view_info,
+                &light,
+                &map,
+                &mut commands,
+                &mut pool,
+                &mut sprite_query
+            );
+        }
+    }
 
-//     pool.hide_unused(&mut sprite_query);
-// }
+    pool.hide_unused(&mut sprite_query);
+}
 
 pub fn get_relative_coords(transform: &Transform, coords: Vec2) -> Vec2 {
     let dx = coords.x - transform.translation.x;
@@ -476,5 +476,3 @@ pub fn column_width(index: usize, view_info: &ViewInfo) -> f32 {
     let x_next = hit_to_screen_x(view_info, next_index);
     (x_next - x_curr).abs().max(1.0)
 }
-
-pub fn group_hits(hits: &Hits) -> HasMap<Wallid, Vec<ColQuadData>> {}

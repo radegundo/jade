@@ -1,5 +1,7 @@
 use bevy::{
+    asset::RenderAssetUsages,
     camera::{ RenderTarget, visibility::RenderLayers },
+    mesh::Indices,
     prelude::*,
     window::{ PresentMode, WindowRef, WindowResolution },
 };
@@ -41,17 +43,20 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(Startup, setup_map)
         //-------------------------RENDER--------------------------
-        .add_systems(Update, render)
+        .add_systems(Update, render_2d)
         //---------------------------MAP--------------------------
         .add_systems(Startup, setup_gizmo_layers)
         .init_gizmo_group::<MapGizmos>()
         .add_plugins(RelativeMapPlugin)
         //--------------------------INPUT--------------------------
         .add_plugins(OwnInputPlugin)
+        .add_systems(Update, sync_camera_to_player)
         //--------------------------RESOURCES--------------------------
         .insert_resource(ViewInfo::default())
         .insert_resource(PlayerCameraCache::default())
         .add_systems(Update, update_player_cache)
+        //--------------------------TEST--------------------------
+        .add_systems(Startup, test_wall_render)
         .run();
 }
 
@@ -116,7 +121,7 @@ fn setup(mut commands: Commands) {
         RenderTarget::Window(WindowRef::Entity(map_win)),
     ));
     //Spawn player
-    commands.spawn((Player, Transform::from_xyz(50.0, 50.0, 0.0)));
+    commands.spawn((Player, Transform::from_xyz(-10.0, 0.0, 0.0)));
 }
 
 //-----------------------------GIZMO CONFIGS--------------------------------
@@ -131,4 +136,63 @@ fn setup_gizmo_layers(mut config_store: ResMut<GizmoConfigStore>) {
 //-----------------------------MAP SETUP--------------------------------
 fn setup_map(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(test_map(asset_server));
+}
+//-----------------------------SYNC--------------------------------
+fn sync_camera_to_player(
+    player_query: Query<&Transform, With<Player>>,
+    mut camera_query: Query<&mut Transform, (With<Camera3d>, Without<Player>)>,
+    view_info: Res<ViewInfo>
+) {
+    if let (Ok(player), Ok(mut camera)) = (player_query.single(), camera_query.single_mut()) {
+        let pos = player.translation;
+        let angle = player.rotation.to_euler(EulerRot::XYZ).2;
+
+        // Position camera at player position + eye height
+        camera.translation = Vec3::new(pos.x, pos.y, view_info.eye_height);
+
+        // Look in the direction the player is facing (XY plane)
+        //Note: It is needed to invert the x-axis because the camera looks in the negative z direction by default
+        let look_target = Vec3::new(pos.x - angle.cos(), pos.y + angle.sin(), view_info.eye_height);
+        camera.look_at(look_target, Vec3::Z);
+    }
+}
+
+//-----------------------------TEST---------------------------------
+fn test_wall_render(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>
+) {
+    let texture: Handle<Image> = asset_server.load("texture.png");
+    let mesh = Mesh::new(bevy::mesh::PrimitiveTopology::TriangleList, RenderAssetUsages::default())
+        .with_inserted_attribute(
+            Mesh::ATTRIBUTE_POSITION,
+            vec![
+                [0.0, 0.0, 0.0], // bottom-left
+                [0.0, 0.0, 100.0], // top-left
+                [100.0, 0.0, 100.0], // top-right
+                [100.0, 0.0, 0.0] // bottom-right
+            ]
+        )
+        .with_inserted_attribute(
+            Mesh::ATTRIBUTE_NORMAL,
+            vec![[0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0]]
+        )
+        .with_inserted_attribute(
+            Mesh::ATTRIBUTE_UV_0,
+            vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+        )
+        .with_inserted_indices(Indices::U32(vec![0, 1, 2, 0, 2, 3]));
+
+    commands.spawn((
+        Mesh3d(meshes.add(mesh)),
+        MeshMaterial3d(
+            materials.add(StandardMaterial {
+                base_color_texture: Some(texture),
+                ..default()
+            })
+        ),
+        Transform::default(),
+    ));
 }

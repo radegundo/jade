@@ -3,7 +3,7 @@ use crate::{ systems::find_player_sector, * };
 use map::*;
 use ray::*;
 
-pub fn render(
+pub fn render_2d(
     mut gizmos: Gizmos<MapGizmos>,
     map: Res<Map>,
     view_info: Res<ViewInfo>,
@@ -31,6 +31,7 @@ pub fn render(
     }
 }
 
+// ------------------------------RENDER HELPERS------------------------------
 fn project_height(world_height: f32, dist: f32, view_info: &ViewInfo) -> f32 {
     let relative = world_height - view_info.eye_height;
     (relative * view_info.view_distance) / dist + view_info.pitch

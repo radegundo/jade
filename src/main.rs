@@ -102,7 +102,7 @@ fn setup(mut commands: Commands) {
     commands.spawn(Camera3d::default());
 
     //Spawn Map Window
-    let resolution: WindowResolution = (500, 500).into();
+    let resolution: WindowResolution = (1920, 1080).into();
     let window_size = Vec2::new(resolution.width(), resolution.height());
 
     let map_win = commands

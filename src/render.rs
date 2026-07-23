@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::*;
+use crate::{ systems::find_player_sector, * };
 use map::*;
 use ray::*;
 
@@ -11,10 +11,27 @@ pub fn render(
 ) {
     let transform = transform_query.single().unwrap();
     for i in 0..RAY_COUNT {
-        let ray_angle = get_ray_angle(i, &transform, &view_info);
-        let ray_offset = get_ray_offset(i, &view_info);
-        let ray_dir = Vec2::new(ray_angle.cos(), ray_angle.sin());
-        let ray_start = transform.translation.truncate();
-        let ray_end = ray_start + ray_dir * view_info.max_distance;
+        if let Some(sector) = find_player_sector(transform.translation.truncate(), &map) {
+            let sector = &map.sectors[sector];
+            if let Some(hit) = get_single_hit(&transform, &view_info, sector.id, &map, i) {
+                let x = hit_to_screen_x(&view_info, i);
+                let window_top = project_height(
+                    map.sectors[sector.id].ceiling_height - EYE_OFFSET,
+                    hit.perp_dist,
+                    &view_info
+                );
+                let window_bottom = project_height(
+                    map.sectors[sector.id].floor_height - EYE_OFFSET,
+                    hit.perp_dist,
+                    &view_info
+                );
+                gizmos.line_2d(Vec2::new(x, window_top), Vec2::new(x, window_bottom), Color::WHITE);
+            }
+        }
     }
+}
+
+fn project_height(world_height: f32, dist: f32, view_info: &ViewInfo) -> f32 {
+    let relative = world_height - view_info.eye_height;
+    (relative * view_info.view_distance) / dist + view_info.pitch
 }

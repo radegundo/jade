@@ -3,7 +3,16 @@ use bevy::{
     prelude::*,
     window::{ PresentMode, WindowRef, WindowResolution },
 };
-use bevy_grid::*;
+
+use crate::{ input::OwnInputPlugin, map::{ relative_map::RelativeMapPlugin, * } };
+use crate::ray::*;
+use crate::render::*;
+
+mod ray;
+mod map;
+mod render;
+mod systems;
+mod input;
 
 //Screen width
 //For naming purposes duplicate the constant
@@ -28,16 +37,31 @@ fn main() {
                 ..default()
             })
         )
-        //SETUP
+        //-------------------------SETUP--------------------------
         .add_systems(Startup, setup)
+        .add_systems(Startup, setup_map)
+        //-------------------------RENDER--------------------------
+        .add_systems(Update, render)
+        //---------------------------MAP--------------------------
         .add_systems(Startup, setup_gizmo_layers)
         .init_gizmo_group::<MapGizmos>()
+        .add_plugins(RelativeMapPlugin)
+        //--------------------------INPUT--------------------------
+        .add_plugins(OwnInputPlugin)
+        //--------------------------RESOURCES--------------------------
+        .insert_resource(ViewInfo::default())
+        .insert_resource(PlayerCameraCache::default())
+        .add_systems(Update, update_player_cache)
         .run();
 }
 
 //Player marker
 #[derive(Component)]
 struct Player;
+
+//Marker for the map window
+#[derive(Component)]
+struct MapWindowMarker;
 
 #[derive(Resource)]
 pub struct ViewInfo {
@@ -60,8 +84,22 @@ impl Default for ViewInfo {
     }
 }
 
+#[derive(Resource, Default)]
+struct PlayerCameraCache {
+    pub transform: Transform,
+}
+
+fn update_player_cache(
+    mut player_cache: ResMut<PlayerCameraCache>,
+    transform_query: Query<&Transform, With<Player>>
+) {
+    let transform = transform_query.single().unwrap();
+    player_cache.transform = *transform;
+}
+
+//-----------------------------SETUP FUNCTIONS--------------------------------
 fn setup(mut commands: Commands) {
-    commands.spawn(Camera2d);
+    commands.spawn(Camera3d::default());
 
     //Spawn Map Window
     let resolution: WindowResolution = (500, 500).into();
@@ -77,12 +115,11 @@ fn setup(mut commands: Commands) {
         RenderLayers::layer(1),
         RenderTarget::Window(WindowRef::Entity(map_win)),
     ));
-
-    //Spawn Map player
+    //Spawn player
     commands.spawn((Player, Transform::from_xyz(50.0, 50.0, 0.0)));
 }
 
-//Setup for different Gizmo configs
+//-----------------------------GIZMO CONFIGS--------------------------------
 #[derive(Default, Reflect, GizmoConfigGroup)]
 pub struct MapGizmos;
 
@@ -91,5 +128,7 @@ fn setup_gizmo_layers(mut config_store: ResMut<GizmoConfigStore>) {
     config.render_layers = RenderLayers::layer(1);
 }
 
-#[derive(Component)]
-struct MapWindowMarker;
+//-----------------------------MAP SETUP--------------------------------
+fn setup_map(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(test_map(asset_server));
+}

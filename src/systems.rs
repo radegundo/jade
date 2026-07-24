@@ -7,6 +7,15 @@ pub struct WallEntityPool {
     pub used: usize,
 }
 
+impl Default for WallEntityPool {
+    fn default() -> Self {
+        Self {
+            entities: Vec::with_capacity(64), // pre-allocate
+            used: 0,
+        }
+    }
+}
+
 pub fn get_relative_coords(transform: &Transform, coords: Vec2) -> Vec2 {
     let dx = coords.x - transform.translation.x;
     let dy = coords.y - transform.translation.y;

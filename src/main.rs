@@ -6,7 +6,11 @@ use bevy::{
     window::{ PresentMode, WindowRef, WindowResolution },
 };
 
-use crate::{ input::OwnInputPlugin, map::{ relative_map::RelativeMapPlugin, * } };
+use crate::{
+    input::OwnInputPlugin,
+    map::{ relative_map::RelativeMapPlugin, * },
+    systems::WallEntityPool,
+};
 use crate::ray::*;
 use crate::render::*;
 
@@ -55,6 +59,7 @@ fn main() {
         //--------------------------RESOURCES--------------------------
         .insert_resource(ViewInfo::default())
         .insert_resource(PlayerCameraCache::default())
+        .insert_resource(WallEntityPool::default())
         .add_systems(Update, update_player_cache)
         //--------------------------TEST--------------------------
         // .add_systems(Startup, test_wall_render)

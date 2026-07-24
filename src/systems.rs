@@ -1,6 +1,12 @@
 use bevy::prelude::*;
 use crate::*;
 
+#[derive(Resource)]
+pub struct WallEntityPool {
+    pub entities: Vec<Entity>,
+    pub used: usize,
+}
+
 pub fn get_relative_coords(transform: &Transform, coords: Vec2) -> Vec2 {
     let dx = coords.x - transform.translation.x;
     let dy = coords.y - transform.translation.y;
@@ -40,4 +46,29 @@ pub fn find_player_sector(player_pos: Vec2, map: &Map) -> Option<usize> {
 pub fn hit_to_screen_x(view_info: &ViewInfo, ray_index: usize) -> f32 {
     let angle = -get_ray_offset(ray_index, &view_info);
     view_info.view_distance * angle.tan()
+}
+
+pub fn group_hits_by_wall(hits: Vec<WallHit>) -> Vec<Vec<WallHit>> {
+    let mut grouped_hits: Vec<Vec<WallHit>> = Vec::new();
+    let mut current_group: Vec<WallHit> = Vec::new();
+
+    for hit in hits {
+        if current_group.is_empty() {
+            current_group.push(hit);
+        } else {
+            let last_hit = current_group.last().unwrap();
+            if last_hit.wall_id == hit.wall_id && last_hit.sector_id == hit.sector_id {
+                current_group.push(hit);
+            } else {
+                grouped_hits.push(current_group);
+                current_group = vec![hit];
+            }
+        }
+    }
+
+    if !current_group.is_empty() {
+        grouped_hits.push(current_group);
+    }
+
+    grouped_hits
 }

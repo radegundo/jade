@@ -59,7 +59,7 @@ fn ray_hit(ray: &Ray, wall: &LineDef) -> Option<Vec2> {
     return None;
 }
 
-pub fn get_single_hit(
+pub fn get_hit_sector(
     transform: &Transform,
     view_info: &ViewInfo,
     sector_index: usize,

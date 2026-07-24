@@ -1,7 +1,6 @@
 use bevy::{
     asset::RenderAssetUsages,
     camera::{ RenderTarget, visibility::RenderLayers },
-    gltf::gltf_ext::texture,
     mesh::Indices,
     prelude::*,
     window::{ PresentMode, WindowRef, WindowResolution },
@@ -41,10 +40,11 @@ fn main() {
             })
         )
         //-------------------------SETUP--------------------------
-        .add_systems(Startup, (setup, setup_map, mesh_setup).chain())
+        .add_systems(Startup, (setup, setup_map).chain())
         // .add_systems(Startup, setup_map)
         //-------------------------RENDER--------------------------
         .add_systems(Update, render_2d)
+        .add_systems(Update, render)
         //---------------------------MAP--------------------------
         .add_systems(Startup, setup_gizmo_layers)
         .init_gizmo_group::<MapGizmos>()

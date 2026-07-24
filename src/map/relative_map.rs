@@ -32,7 +32,7 @@ pub fn draw_rays(
 ) {
     if let Some(sector) = find_player_sector(player_cache.transform.translation.truncate(), &map) {
         for i in 0..RAY_COUNT {
-            if let Some(hit) = get_single_hit(&player_cache.transform, &view_info, sector, &map, i) {
+            if let Some(hit) = get_hit_sector(&player_cache.transform, &view_info, sector, &map, i) {
                 let rel_hit_pos = get_relative_coords(&player_cache.transform, hit.pos);
                 gizmos.line_2d(Vec2::ZERO, rel_hit_pos, Color::srgb(1.0, 0.0, 0.0));
             }

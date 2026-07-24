@@ -41,7 +41,7 @@ fn main() {
             })
         )
         //-------------------------SETUP--------------------------
-        .add_systems(Startup, (setup, setup_map, setup_wall_mesh).chain())
+        .add_systems(Startup, (setup, setup_map, mesh_setup).chain())
         // .add_systems(Startup, setup_map)
         //-------------------------RENDER--------------------------
         .add_systems(Update, render_2d)
@@ -57,6 +57,8 @@ fn main() {
         .insert_resource(PlayerCameraCache::default())
         .add_systems(Update, update_player_cache)
         //--------------------------TEST--------------------------
+        // .add_systems(Startup, test_wall_render)
+        // .add_systems(Startup, mesh_setup)
         .run();
 }
 
@@ -137,29 +139,6 @@ fn setup_gizmo_layers(mut config_store: ResMut<GizmoConfigStore>) {
 fn setup_map(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(test_map(asset_server));
 }
-fn setup_wall_mesh(
-    mut commands: Commands,
-    map: Res<Map>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>
-) {
-    for sector in &map.sectors {
-        for wall in &sector.walls {
-            let mesh = build_wall_mesh(wall, &sector);
-            let material = StandardMaterial {
-                base_color_texture: Some(
-                    wall.front_side_def.textures.middle.clone().unwrap().clone()
-                ),
-                ..default()
-            };
-            commands.spawn((
-                Mesh3d(meshes.add(mesh)),
-                MeshMaterial3d(materials.add(material)),
-                Transform::default(),
-            ));
-        }
-    }
-}
 //-----------------------------SYNC--------------------------------
 fn sync_camera_to_player(
     player_query: Query<&Transform, With<Player>>,
@@ -170,10 +149,17 @@ fn sync_camera_to_player(
         let pos = player.translation;
         let angle = player.rotation.to_euler(EulerRot::XYZ).2;
 
+        // Camera at player position + eye height
         camera.translation = Vec3::new(pos.x, pos.y, view_info.eye_height);
 
-        // Forward is (cos, sin) in XY. Look 1 unit ahead.
-        let look_target = Vec3::new(pos.x + angle.cos(), pos.y + angle.sin(), view_info.eye_height);
+        // Look in the direction of player rotation
+        // Player forward is (cos(angle), sin(angle)) in XY
+        // Camera should look at a point in that direction
+        let look_target = Vec3::new(
+            pos.x + angle.cos(), // NO inversion
+            pos.y + angle.sin(),
+            view_info.eye_height
+        );
         camera.look_at(look_target, Vec3::Z);
     }
 }

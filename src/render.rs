@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{ prelude::* };
 use crate::{ systems::find_player_sector, * };
 use map::*;
 use ray::*;
@@ -28,6 +28,33 @@ pub fn render_2d(
                 );
                 gizmos.line_2d(Vec2::new(x, window_top), Vec2::new(x, window_bottom), Color::WHITE);
             }
+        }
+    }
+}
+
+pub fn mesh_setup(
+    mut commands: Commands,
+    map: Res<Map>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>
+) {
+    for sector in &map.sectors {
+        for wall in &sector.walls {
+            if wall.back_side_def.is_some() {
+                continue; // Skip back-facing walls for now
+            }
+            let mesh = build_wall_mesh(wall, &sector);
+            let material = StandardMaterial {
+                base_color_texture: Some(
+                    wall.front_side_def.textures.middle.clone().unwrap().clone()
+                ),
+                ..default()
+            };
+            commands.spawn((
+                Mesh3d(meshes.add(mesh)),
+                MeshMaterial3d(materials.add(material)),
+                Transform::default(),
+            ));
         }
     }
 }

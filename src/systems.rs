@@ -36,3 +36,8 @@ pub fn find_player_sector(player_pos: Vec2, map: &Map) -> Option<usize> {
     }
     None
 }
+
+pub fn hit_to_screen_x(view_info: &ViewInfo, ray_index: usize) -> f32 {
+    let angle = -get_ray_offset(ray_index, &view_info);
+    view_info.view_distance * angle.tan()
+}

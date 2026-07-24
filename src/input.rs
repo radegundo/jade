@@ -48,10 +48,10 @@ pub fn input(
         let mut rotation = 0.0;
 
         if keyboard_input.pressed(KeyCode::KeyQ) {
-            rotation -= turn_speed * time.delta_secs();
+            rotation += turn_speed * time.delta_secs();
         }
         if keyboard_input.pressed(KeyCode::KeyE) {
-            rotation += turn_speed * time.delta_secs();
+            rotation -= turn_speed * time.delta_secs();
         }
 
         transform.rotate_z(rotation);

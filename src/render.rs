@@ -1,6 +1,6 @@
 use std::cmp::min;
 
-use bevy::{ prelude::*, state::commands, transform };
+use bevy::{ mesh::PrimitiveTopology, prelude::*, state::commands, transform };
 use crate::{ systems::find_player_sector, * };
 use map::*;
 use ray::*;
@@ -115,93 +115,53 @@ pub fn render(
     }
 }
 
-// pub fn mesh_setup(
-//     mut commands: Commands,
-//     map: Res<Map>,
-//     mut meshes: ResMut<Assets<Mesh>>,
-//     mut materials: ResMut<Assets<StandardMaterial>>
-// ) {
-//     for sector in &map.sectors {
-//         for wall in &sector.walls {
-//             if wall.back_side_def.is_some() {
-//                 continue; // Skip back-facing walls for now
-//             }
-//             let mesh = build_wall_mesh(wall, &sector);
-//             let material = StandardMaterial {
-//                 base_color_texture: Some(
-//                     wall.front_side_def.textures.middle.clone().unwrap().clone()
-//                 ),
-//                 ..default()
-//             };
-//             commands.spawn((
-//                 Mesh3d(meshes.add(mesh)),
-//                 MeshMaterial3d(materials.add(material)),
-//                 Transform::default(),
-//             ));
-//         }
-//     }
-// }
-
 // ------------------------------RENDER HELPERS------------------------------
 fn project_height(world_height: f32, dist: f32, view_info: &ViewInfo) -> f32 {
     let relative = world_height - view_info.eye_height;
     (relative * view_info.view_distance) / dist + view_info.pitch
 }
 
-pub fn build_wall_mesh(hit_group: &Vec<WallHit>, wall: &LineDef, sector: &Sector) -> Mesh {
-    // TODO: Implement mesh building logic based on the hit group and sector information
-    let start = &hit_group[0];
-    let end = &hit_group[hit_group.len() - 1];
+pub fn build_wall_mesh(hit_group: &[WallHit], wall: &LineDef, sector: &Sector) -> Mesh {
+    let start = hit_group.first().unwrap();
+    let end = hit_group.last().unwrap();
+
+    // World-space positions (where the rays actually hit the wall)
+    let p0 = start.pos; // left hit point on wall
+    let p1 = end.pos; // right hit point on wall
+
+    // Wall length in world space for texture scaling
+    let wall_length = wall.start.distance(wall.end);
+
+    // Distance along the wall from its start point
+    let u0 = p0.distance(wall.start) / wall_length;
+    let u1 = p1.distance(wall.start) / wall_length;
+
+    // Build mesh with world-space positions
     let positions = vec![
-        [start.pos.x, start.pos.y, sector.floor_height],
-        [end.pos.x, end.pos.y, sector.floor_height],
-        [end.pos.x, end.pos.y, sector.ceiling_height],
-        [start.pos.x, start.pos.y, sector.ceiling_height]
+        [p0.x, p0.y, sector.floor_height],
+        [p1.x, p1.y, sector.floor_height],
+        [p1.x, p1.y, sector.ceiling_height],
+        [p0.x, p0.y, sector.ceiling_height]
     ];
+
     let normal = wall_normal(wall).extend(0.0);
-    let normals = vec![
-        [normal.x, normal.y, normal.z],
-        [normal.x, normal.y, normal.z],
-        [normal.x, normal.y, normal.z],
-        [normal.x, normal.y, normal.z]
+    let normals = vec![[normal.x, normal.y, normal.z]; 4];
+
+    // UVs anchored to world-space position on the wall
+    let uvs = vec![
+        [u0, 1.0], // bottom-left
+        [u1, 1.0], // bottom-right
+        [u1, 0.0], // top-right
+        [u0, 0.0] // top-left
     ];
-    let uvs = vec![[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]];
-    let mesh = Mesh::new(bevy::mesh::PrimitiveTopology::TriangleList, RenderAssetUsages::default())
+
+    Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
         .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
         .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
-        .with_inserted_indices(Indices::U32(vec![0, 2, 1, 0, 3, 2]));
-    mesh
+        .with_inserted_indices(Indices::U32(vec![0, 2, 1, 0, 3, 2]))
 }
 
-// pub fn build_wall_mesh(wall: &LineDef, sector: &Sector) -> Mesh {
-//     let normal = wall_normal(wall).extend(0.0);
-//     let mesh = Mesh::new(bevy::mesh::PrimitiveTopology::TriangleList, RenderAssetUsages::default())
-//         .with_inserted_attribute(
-//             Mesh::ATTRIBUTE_POSITION,
-//             vec![
-//                 [wall.start.x, wall.start.y, sector.floor_height],
-//                 [wall.end.x, wall.end.y, sector.floor_height],
-//                 [wall.end.x, wall.end.y, sector.ceiling_height],
-//                 [wall.start.x, wall.start.y, sector.ceiling_height]
-//             ]
-//         )
-//         .with_inserted_attribute(
-//             Mesh::ATTRIBUTE_NORMAL,
-//             vec![
-//                 [normal.x, normal.y, normal.z],
-//                 [normal.x, normal.y, normal.z],
-//                 [normal.x, normal.y, normal.z],
-//                 [normal.x, normal.y, normal.z]
-//             ]
-//         )
-//         .with_inserted_attribute(
-//             Mesh::ATTRIBUTE_UV_0,
-//             vec![[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]]
-//         )
-//         .with_inserted_indices(Indices::U32(vec![0, 2, 1, 0, 3, 2]));
-//     mesh
-// }
 fn wall_normal(line_def: &LineDef) -> Vec2 {
     let dir = (line_def.end - line_def.start).normalize_or_zero();
     Vec2::new(dir.y, -dir.x) // inward normal for CCW sectors

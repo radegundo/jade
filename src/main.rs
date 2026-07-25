@@ -6,13 +6,7 @@ use bevy::{
     window::{ PresentMode, WindowRef, WindowResolution },
 };
 
-use crate::{
-    input::OwnInputPlugin,
-    map::{ relative_map::RelativeMapPlugin, * },
-    systems::WallEntityPool,
-};
-use crate::ray::*;
-use crate::render::*;
+use crate::{ input::OwnInputPlugin, map::MapPlugin, render::RenderPlugin };
 
 mod ray;
 mod map;
@@ -44,22 +38,18 @@ fn main() {
             })
         )
         //-------------------------SETUP--------------------------
-        .add_systems(Startup, (setup, setup_map).chain())
+        .add_systems(Startup, setup)
         // .add_systems(Startup, setup_map)
         //-------------------------RENDER--------------------------
-        .add_systems(Update, render_2d)
-        .add_systems(Update, render)
+        .add_plugins(RenderPlugin)
         //---------------------------MAP--------------------------
-        .add_systems(Startup, setup_gizmo_layers)
-        .init_gizmo_group::<MapGizmos>()
-        .add_plugins(RelativeMapPlugin)
+        .add_plugins(MapPlugin)
         //--------------------------INPUT--------------------------
         .add_plugins(OwnInputPlugin)
         .add_systems(Update, sync_camera_to_player)
         //--------------------------RESOURCES--------------------------
         .insert_resource(ViewInfo::default())
         .insert_resource(PlayerCameraCache::default())
-        .insert_resource(WallEntityPool::default())
         .add_systems(Update, update_player_cache)
         //--------------------------TEST--------------------------
         // .add_systems(Startup, test_wall_render)
@@ -75,6 +65,7 @@ struct Player;
 #[derive(Component)]
 struct MapWindowMarker;
 
+//--------------VIEW INFO---------------------
 #[derive(Resource)]
 pub struct ViewInfo {
     pub fov: f32,
@@ -96,6 +87,7 @@ impl Default for ViewInfo {
     }
 }
 
+//-----------------CACHE FOR PLAYER INFO-----------------
 #[derive(Resource, Default)]
 struct PlayerCameraCache {
     pub transform: Transform,
@@ -131,19 +123,6 @@ fn setup(mut commands: Commands) {
     commands.spawn((Player, Transform::from_xyz(-10.0, 0.0, 0.0)));
 }
 
-//-----------------------------GIZMO CONFIGS--------------------------------
-#[derive(Default, Reflect, GizmoConfigGroup)]
-pub struct MapGizmos;
-
-fn setup_gizmo_layers(mut config_store: ResMut<GizmoConfigStore>) {
-    let (config, _) = config_store.config_mut::<MapGizmos>();
-    config.render_layers = RenderLayers::layer(1);
-}
-
-//-----------------------------MAP SETUP--------------------------------
-fn setup_map(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.insert_resource(test_map(asset_server));
-}
 //-----------------------------SYNC--------------------------------
 fn sync_camera_to_player(
     player_query: Query<&Transform, With<Player>>,

@@ -32,10 +32,10 @@ pub fn input(
             movement -= forward;
         }
         if keyboard_input.pressed(KeyCode::KeyD) {
-            movement += right;
+            movement -= right;
         }
         if keyboard_input.pressed(KeyCode::KeyA) {
-            movement -= right;
+            movement += right;
         }
 
         if movement != Vec2::ZERO {

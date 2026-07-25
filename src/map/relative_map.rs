@@ -1,6 +1,10 @@
 use bevy::prelude::*;
-use crate::*;
-use systems::*;
+use crate::{
+    map::{ Map, MapGizmos, find_player_sector },
+    ray::get_hit_sector,
+    systems::get_relative_coords,
+    *,
+};
 pub struct RelativeMapPlugin;
 
 impl Plugin for RelativeMapPlugin {

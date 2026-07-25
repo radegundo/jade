@@ -1,7 +1,21 @@
-use bevy::prelude::*;
+use bevy::{ camera::visibility::RenderLayers, prelude::* };
+
+use crate::map::relative_map::RelativeMapPlugin;
 
 pub mod relative_map;
 
+//------------------------------MAP PLUGIN-------------------------
+pub struct MapPlugin;
+impl Plugin for MapPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(Startup, setup_gizmo_layers)
+            .add_systems(Startup, setup_map)
+            .init_gizmo_group::<MapGizmos>()
+            .add_plugins(RelativeMapPlugin);
+    }
+}
+
+//------------------------------MAP DATA STRUCTURES-----------------
 #[derive(Resource)]
 pub struct Map {
     pub sectors: Vec<Sector>,
@@ -47,6 +61,21 @@ pub struct SideDefTextures {
     pub upper: Option<Handle<Image>>,
     pub middle: Option<Handle<Image>>,
     pub lower: Option<Handle<Image>>,
+}
+//------------MINI MAP----------------------------
+
+//-----------------------------GIZMO CONFIGS--------------------------------
+#[derive(Default, Reflect, GizmoConfigGroup)]
+pub struct MapGizmos;
+
+fn setup_gizmo_layers(mut config_store: ResMut<GizmoConfigStore>) {
+    let (config, _) = config_store.config_mut::<MapGizmos>();
+    config.render_layers = RenderLayers::layer(1);
+}
+
+//-----------------------------MAP SETUP--------------------------------
+fn setup_map(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(test_map(asset_server));
 }
 
 //------------HELPER FUNCTIONS FOR SECTOR BUILDING----------------
@@ -216,7 +245,32 @@ impl SectorBuilder {
         }
     }
 }
+//---------------SYSTEMS----------------------
 
+pub fn point_in_sector(point: Vec2, sector: &Sector) -> bool {
+    let mut inside = false;
+    for wall in &sector.walls {
+        let (x1, y1) = (wall.start.x, wall.start.y);
+        let (x2, y2) = (wall.end.x, wall.end.y);
+        let crosses = (y1 > point.y) != (y2 > point.y);
+        if crosses {
+            let x_intersect = x1 + ((point.y - y1) / (y2 - y1)) * (x2 - x1);
+            if point.x < x_intersect {
+                inside = !inside;
+            }
+        }
+    }
+    inside
+}
+
+pub fn find_player_sector(player_pos: Vec2, map: &Map) -> Option<usize> {
+    for (i, sector) in map.sectors.iter().enumerate() {
+        if point_in_sector(player_pos, sector) {
+            return Some(i);
+        }
+    }
+    None
+}
 //-------------- MAP FUNCTIONS------------------------
 
 // pub fn test_map(asset_server: Res<AssetServer>) -> Map {

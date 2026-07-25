@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use crate::*;
 use map::*;
 
+//--------------------------DATA STRUCTURES-------------------------------
 struct Ray {
     start: Vec2,
     // Sample a point in the direction of the ray
@@ -18,7 +19,7 @@ pub struct WallHit {
     pub back_sector: Option<usize>,
 }
 
-// ----- HELPER FUNCTIONS
+// ----------------------HELPER FUNCTIONS---------------------------
 pub fn get_ray_angle(ray_index: usize, transform: &Transform, view_info: &ViewInfo) -> f32 {
     let player_angle = transform.rotation.to_euler(EulerRot::XYZ).2;
     let fov_rad = view_info.fov.to_radians();
@@ -102,4 +103,10 @@ pub fn get_hit_sector(
             back_sector: wall.back_side_def.as_ref().map(|s| s.facing),
         }
     })
+}
+//----------------------------SYSTEMS------------------
+
+pub fn hit_to_screen_x(view_info: &ViewInfo, ray_index: usize) -> f32 {
+    let angle = -get_ray_offset(ray_index, &view_info);
+    view_info.view_distance * angle.tan()
 }

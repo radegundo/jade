@@ -1,11 +1,20 @@
 use std::cmp::min;
 
-use bevy::{ mesh::PrimitiveTopology, prelude::*, state::commands, transform };
-use crate::{ systems::find_player_sector, * };
-use map::*;
-use ray::*;
-use systems::*;
+use bevy::{ mesh::PrimitiveTopology, prelude::* };
+use crate::ray::*;
+use crate::map::*;
+use crate::*;
 
+//------------------PLUGIN---------------------------------------
+pub struct RenderPlugin;
+impl Plugin for RenderPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(Update, render)
+            .add_systems(Update, render_2d)
+            .insert_resource(WallEntityPool::default());
+    }
+}
+//------------------MAIN RENDER FUNCTIONS------------------------
 pub fn render_2d(
     mut gizmos: Gizmos<MapGizmos>,
     map: Res<Map>,
@@ -114,6 +123,22 @@ pub fn render(
         }
     }
 }
+//-------------------------------RESOURCES-------------------------------
+
+#[derive(Resource)]
+pub struct WallEntityPool {
+    pub entities: Vec<Entity>,
+    pub used: usize,
+}
+
+impl Default for WallEntityPool {
+    fn default() -> Self {
+        Self {
+            entities: Vec::with_capacity(64), // pre-allocate
+            used: 0,
+        }
+    }
+}
 
 // ------------------------------RENDER HELPERS------------------------------
 fn project_height(world_height: f32, dist: f32, view_info: &ViewInfo) -> f32 {
@@ -165,4 +190,29 @@ pub fn build_wall_mesh(hit_group: &[WallHit], wall: &LineDef, sector: &Sector) -
 fn wall_normal(line_def: &LineDef) -> Vec2 {
     let dir = (line_def.end - line_def.start).normalize_or_zero();
     Vec2::new(dir.y, -dir.x) // inward normal for CCW sectors
+}
+
+fn group_hits_by_wall(hits: Vec<WallHit>) -> Vec<Vec<WallHit>> {
+    let mut grouped_hits: Vec<Vec<WallHit>> = Vec::new();
+    let mut current_group: Vec<WallHit> = Vec::new();
+
+    for hit in hits {
+        if current_group.is_empty() {
+            current_group.push(hit);
+        } else {
+            let last_hit = current_group.last().unwrap();
+            if last_hit.wall_id == hit.wall_id && last_hit.sector_id == hit.sector_id {
+                current_group.push(hit);
+            } else {
+                grouped_hits.push(current_group);
+                current_group = vec![hit];
+            }
+        }
+    }
+
+    if !current_group.is_empty() {
+        grouped_hits.push(current_group);
+    }
+
+    grouped_hits
 }

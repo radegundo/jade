@@ -1,5 +1,6 @@
 use std::cmp::min;
 
+use bevy::platform::collections::{ HashMap, HashSet };
 use bevy::{ mesh::PrimitiveTopology, prelude::* };
 use crate::ray::*;
 use crate::map::*;
@@ -54,75 +55,175 @@ pub fn render(
     mut query: Query<&mut Visibility>
 ) {
     let transform = &player_cache.transform;
-    // Find the sector the player is in
+
     if let Some(player_sector_index) = find_player_sector(transform.translation.truncate(), &map) {
-        let mut hits = Vec::new();
-        //1. HIT GROUPING
-        for i in 0..RAY_COUNT {
-            //Get hits for the sector the player is in
-            let hit = get_hit_sector(&transform, &view_info, player_sector_index, &map, i).unwrap();
-            hits.push(hit);
-        }
-        let grouped_hits = group_hits_by_wall(hits);
+        // 1. Collect ALL visible wall groups from ALL sectors via portal recursion
+        let mut all_groups: Vec<WallGroup> = Vec::new();
+        let mut visited: HashSet<usize> = HashSet::new();
 
-        //2. POOL MANAGEMENT
-        let needed = grouped_hits.len();
-        let pool_size = pool.entities.len();
-        //TODO GET ENTITY INFO
-        for i in 0..min(needed, pool_size) {
-            let entity = pool.entities[i];
-            let hit_group = &grouped_hits[i];
-            if !hit_group[0].is_portal {
-                let id = hit_group[0].wall_id;
-                let wall_index = id.index; // let mesh = build_wall_mesh(hit_group, sector);
-                let sector_index = id.sector;
-                let sector = &map.sectors[sector_index];
-                let wall = &sector.walls[wall_index];
-                let mesh = build_wall_mesh(&hit_group, &wall, &sector);
-                let material = StandardMaterial {
-                    base_color_texture: map.sectors[sector_index].walls[
-                        wall_index
-                    ].front_side_def.textures.middle.clone(),
-                    ..default()
-                };
-                commands
-                    .entity(entity)
-                    .insert(Visibility::Visible)
-                    .insert(Mesh3d(meshes.add(mesh)))
-                    .insert(MeshMaterial3d(materials.add(material)));
-            }
-        }
-        //3. HIDE NOT NEEDED ENTITIES
-        for i in needed..pool.used.min(pool_size) {
-            if let Ok(mut vis) = query.get_mut(pool.entities[i]) {
-                *vis = Visibility::Hidden;
-            }
-        }
+        let initial_origins: Vec<(usize, Vec2)> = (0..RAY_COUNT)
+            .map(|i| (i, transform.translation.truncate()))
+            .collect();
 
-        //4. SPAWN OVERFLOW
-        if needed > pool_size {
-            for i in pool_size..needed {
-                let hit_group = &grouped_hits[i];
-                let id = hit_group[0].wall_id;
-                let wall_index = id.index; // let mesh = build_wall_mesh(hit_group, sector);
-                let sector_index = id.sector;
-                let sector = &map.sectors[sector_index];
-                let wall = &sector.walls[wall_index];
+        let mut visited_per_ray: HashMap<usize, HashSet<usize>> = HashMap::new();
 
-                let entity = commands
-                    .spawn((
-                        Visibility::Visible,
-                        Mesh3d(meshes.add(build_wall_mesh(hit_group, &wall, &sector))),
-                        // MeshMaterial2d(materials.add(build_wall_material(hit_group, sector))),
-                        Transform::default(),
-                    ))
-                    .id();
+        recurse_sector(
+            transform,
+            &view_info,
+            player_sector_index,
+            &map,
+            &initial_origins,
+            &mut visited_per_ray,
+            &mut all_groups
+        );
 
-                pool.entities.push(entity);
-            }
-        }
+        // 2. Render all collected wall groups using the pool
+        render_wall_groups(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &mut pool,
+            &mut query,
+            &all_groups
+        );
     }
 }
+
+fn recurse_sector(
+    player_transform: &Transform,
+    view_info: &ViewInfo,
+    sector_index: usize,
+    map: &Map,
+    // CHANGED: carry per-ray origins instead of a flat range once you're past the first sector
+    ray_origins: &[(usize, Vec2)], // (ray_index, origin) pairs
+    visited_per_ray: &mut HashMap<usize, HashSet<usize>>, // per-ray visited sectors, not global
+    all_groups: &mut Vec<WallGroup>
+) {
+    let mut hits: Vec<WallHit> = Vec::new();
+
+    for &(index, origin) in ray_origins {
+        // skip if this specific ray already visited this sector (prevents infinite loop per-ray)
+        let visited = visited_per_ray.entry(index).or_default();
+        if visited.contains(&sector_index) {
+            continue;
+        }
+        visited.insert(sector_index);
+
+        let angle = get_ray_angle(index, player_transform, view_info);
+        let offset = get_ray_offset(index, view_info);
+
+        if
+            let Some(hit) = get_hit_sector_recursive(
+                origin,
+                angle,
+                offset,
+                view_info,
+                sector_index,
+                map,
+                index
+            )
+        {
+            hits.push(hit);
+        }
+    }
+
+    let grouped = group_hits_by_wall(hits);
+    let mut portal_next: HashMap<usize, Vec<(usize, Vec2)>> = HashMap::new();
+
+    for group in grouped {
+        if group.is_empty() {
+            continue;
+        }
+
+        if group[0].is_portal {
+            if let Some(back) = group[0].back_sector {
+                for hit in &group {
+                    let angle = get_ray_angle(hit.ray_index, player_transform, view_info);
+                    let dir = Vec2::new(angle.cos(), angle.sin());
+                    let nudged = hit.pos + dir * 0.05; // NUDGE past the portal edge
+                    portal_next.entry(back).or_default().push((hit.ray_index, nudged));
+                }
+            }
+        } else {
+            let wall = map.sectors[sector_index].walls[group[0].wall_id.index].clone();
+            let sector = map.sectors[sector_index].clone();
+            all_groups.push(WallGroup { hits: group, wall, sector });
+        }
+    }
+
+    for (next_sector, origins) in portal_next {
+        recurse_sector(
+            player_transform,
+            view_info,
+            next_sector,
+            map,
+            &origins,
+            visited_per_ray,
+            all_groups
+        );
+    }
+}
+
+struct WallGroup {
+    hits: Vec<WallHit>,
+    wall: LineDef, // cloned or referenced
+    sector: Sector, // or sector_index
+}
+
+fn render_wall_groups(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    pool: &mut ResMut<WallEntityPool>,
+    query: &mut Query<&mut Visibility>,
+    groups: &[WallGroup]
+) {
+    let needed = groups.len();
+    let pool_size = pool.entities.len();
+
+    // 1. Activate/reuse pool entities
+    for i in 0..min(needed, pool_size) {
+        let entity = pool.entities[i];
+        let group = &groups[i];
+
+        let mesh = build_wall_mesh(&group.hits, &group.wall, &group.sector);
+        let material = StandardMaterial {
+            base_color_texture: group.wall.front_side_def.textures.middle.clone(),
+            ..default()
+        };
+
+        commands
+            .entity(entity)
+            .insert(Visibility::Visible)
+            .insert(Mesh3d(meshes.add(mesh)))
+            .insert(MeshMaterial3d(materials.add(material)));
+    }
+
+    // 2. Hide unused entities
+    for i in needed..pool.used.min(pool_size) {
+        if let Ok(mut vis) = query.get_mut(pool.entities[i]) {
+            *vis = Visibility::Hidden;
+        }
+    }
+
+    // 3. Spawn overflow
+    if needed > pool_size {
+        for i in pool_size..needed {
+            let group = &groups[i];
+            let entity = commands
+                .spawn((
+                    Visibility::Visible,
+                    Mesh3d(meshes.add(build_wall_mesh(&group.hits, &group.wall, &group.sector))),
+                    Transform::default(),
+                ))
+                .id();
+            pool.entities.push(entity);
+        }
+    }
+
+    pool.used = needed;
+}
+
 //-------------------------------RESOURCES-------------------------------
 
 #[derive(Resource)]

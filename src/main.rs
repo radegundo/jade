@@ -120,7 +120,7 @@ fn setup(mut commands: Commands) {
         RenderTarget::Window(WindowRef::Entity(map_win)),
     ));
     //Spawn player
-    commands.spawn((Player, Transform::from_xyz(-10.0, 0.0, 0.0)));
+    commands.spawn((Player, Transform::from_xyz(50.0, 50.0, 0.0)));
 }
 
 //-----------------------------SYNC--------------------------------

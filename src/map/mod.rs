@@ -21,6 +21,7 @@ pub struct Map {
     pub sectors: Vec<Sector>,
 }
 
+#[derive(Clone)]
 pub struct Sector {
     pub walls: Vec<LineDef>,
     pub floor_height: f32,
@@ -43,6 +44,7 @@ impl WallId {
     }
 }
 
+#[derive(Clone)]
 pub struct LineDef {
     pub start: Vec2,
     pub end: Vec2,
@@ -51,12 +53,14 @@ pub struct LineDef {
     pub id: WallId,
 }
 
+#[derive(Clone)]
 pub struct SideDef {
     pub textures: SideDefTextures,
     /// Sector the side def is facing
     pub facing: usize,
 }
 
+#[derive(Clone)]
 pub struct SideDefTextures {
     pub upper: Option<Handle<Image>>,
     pub middle: Option<Handle<Image>>,
@@ -273,71 +277,71 @@ pub fn find_player_sector(player_pos: Vec2, map: &Map) -> Option<usize> {
 }
 //-------------- MAP FUNCTIONS------------------------
 
-// pub fn test_map(asset_server: Res<AssetServer>) -> Map {
-//     let wall_tex: Handle<Image> = asset_server.load("texture.png");
-//     let floor_tex: Handle<Image> = asset_server.load("floor_texture.png");
-//     let ceil_tex: Handle<Image> = asset_server.load("floor_texture.png");
-
-//     Map {
-//         sectors: vec![
-//             // Sector 0: Main room, 100x100, floor at 0, ceiling at 20
-//             SectorBuilder::new(0, 0.0, 20.0, floor_tex.clone(), ceil_tex.clone())
-//                 .wall(0.0, 0.0, 100.0, 0.0, 0, wall_tex.clone()) // Bottom: (0,0) → (100,0)
-//                 .wall(100.0, 0.0, 100.0, 40.0, 1, wall_tex.clone()) // Right lower: (100,0) → (100,40)
-//                 .portal(
-//                     100.0,
-//                     40.0, // Portal start
-//                     100.0,
-//                     60.0, // Portal end
-//                     2, // wall index
-//                     wall_tex.clone(), // upper texture
-//                     wall_tex.clone(), // lower texture
-//                     0, // front sector (this)
-//                     1 // back sector (sector 1)
-//                 )
-//                 .wall(100.0, 60.0, 100.0, 100.0, 3, wall_tex.clone()) // Right upper: (100,60) → (100,100)
-//                 .wall(100.0, 100.0, 0.0, 100.0, 4, wall_tex.clone()) // Top: (100,100) → (0,100)
-//                 .wall(0.0, 100.0, 0.0, 0.0, 5, wall_tex.clone()) // Left: (0,100) → (0,0)
-//                 .build(),
-
-//             // Sector 1: Corridor/room to the right of the portal
-//             // Extends from x=100 to x=140, y=40 to y=60
-//             // Portal is the LEFT edge (x=100), shared with sector 0
-//             SectorBuilder::new(1, 0.0, 20.0, floor_tex.clone(), ceil_tex.clone())
-//                 .wall(100.0, 40.0, 140.0, 40.0, 0, wall_tex.clone()) // Bottom: (100,40) → (140,40)
-//                 .wall(140.0, 40.0, 140.0, 60.0, 1, wall_tex.clone()) // Right: (140,40) → (140,60)
-//                 .wall(140.0, 60.0, 100.0, 60.0, 2, wall_tex.clone()) // Top: (140,60) → (100,60)
-//                 .portal(
-//                     100.0,
-//                     60.0, // Portal start (top of shared edge)
-//                     100.0,
-//                     40.0, // Portal end (bottom of shared edge)
-//                     3, // wall index
-//                     wall_tex.clone(), // upper
-//                     wall_tex.clone(), // lower
-//                     1, // front sector (this)
-//                     0 // back sector (sector 0)
-//                 )
-//                 .build()
-//         ],
-//     }
-// }
 pub fn test_map(asset_server: Res<AssetServer>) -> Map {
-    let texture: Handle<Image> = asset_server.load("texture.png");
+    let wall_tex: Handle<Image> = asset_server.load("texture.png");
+    let floor_tex: Handle<Image> = asset_server.load("floor_texture.png");
+    let ceil_tex: Handle<Image> = asset_server.load("floor_texture.png");
+
     Map {
         sectors: vec![
-            rect_sector(
-                0,
-                0.0,
-                0.0,
-                100.0,
-                100.0,
-                0.0,
-                10.0,
-                texture.clone(),
-                texture.clone(),
-                texture.clone()
-            )
+            // Sector 0: Main room, 100x100, floor at 0, ceiling at 20
+            SectorBuilder::new(0, 0.0, 20.0, floor_tex.clone(), ceil_tex.clone())
+                .wall(0.0, 0.0, 100.0, 0.0, 0, wall_tex.clone()) // Bottom: (0,0) → (100,0)
+                .wall(100.0, 0.0, 100.0, 40.0, 1, wall_tex.clone()) // Right lower: (100,0) → (100,40)
+                .portal(
+                    100.0,
+                    40.0, // Portal start
+                    100.0,
+                    60.0, // Portal end
+                    2, // wall index
+                    wall_tex.clone(), // upper texture
+                    wall_tex.clone(), // lower texture
+                    0, // front sector (this)
+                    1 // back sector (sector 1)
+                )
+                .wall(100.0, 60.0, 100.0, 100.0, 3, wall_tex.clone()) // Right upper: (100,60) → (100,100)
+                .wall(100.0, 100.0, 0.0, 100.0, 4, wall_tex.clone()) // Top: (100,100) → (0,100)
+                .wall(0.0, 100.0, 0.0, 0.0, 5, wall_tex.clone()) // Left: (0,100) → (0,0)
+                .build(),
+
+            // Sector 1: Corridor/room to the right of the portal
+            // Extends from x=100 to x=140, y=40 to y=60
+            // Portal is the LEFT edge (x=100), shared with sector 0
+            SectorBuilder::new(1, 0.0, 20.0, floor_tex.clone(), ceil_tex.clone())
+                .wall(100.0, 40.0, 140.0, 40.0, 0, wall_tex.clone()) // Bottom: (100,40) → (140,40)
+                .wall(140.0, 40.0, 140.0, 60.0, 1, wall_tex.clone()) // Right: (140,40) → (140,60)
+                .wall(140.0, 60.0, 100.0, 60.0, 2, wall_tex.clone()) // Top: (140,60) → (100,60)
+                .portal(
+                    100.0,
+                    60.0, // Portal start (top of shared edge)
+                    100.0,
+                    40.0, // Portal end (bottom of shared edge)
+                    3, // wall index
+                    wall_tex.clone(), // upper
+                    wall_tex.clone(), // lower
+                    1, // front sector (this)
+                    0 // back sector (sector 0)
+                )
+                .build()
         ],
     }
 }
+// pub fn test_map(asset_server: Res<AssetServer>) -> Map {
+//     let texture: Handle<Image> = asset_server.load("texture.png");
+//     Map {
+//         sectors: vec![
+//             rect_sector(
+//                 0,
+//                 0.0,
+//                 0.0,
+//                 100.0,
+//                 100.0,
+//                 0.0,
+//                 10.0,
+//                 texture.clone(),
+//                 texture.clone(),
+//                 texture.clone()
+//             )
+//         ],
+//     }
+// }

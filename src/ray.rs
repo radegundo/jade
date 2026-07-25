@@ -17,6 +17,7 @@ pub struct WallHit {
     pub wall_id: WallId,
     pub is_portal: bool,
     pub back_sector: Option<usize>,
+    pub ray_index: usize,
 }
 
 // ----------------------HELPER FUNCTIONS---------------------------
@@ -60,6 +61,8 @@ fn ray_hit(ray: &Ray, wall: &LineDef) -> Option<Vec2> {
     return None;
 }
 
+//---------------------RAY HIT PER SECTOR---------------------------
+
 pub fn get_hit_sector(
     transform: &Transform,
     view_info: &ViewInfo,
@@ -101,6 +104,49 @@ pub fn get_hit_sector(
             wall_id,
             is_portal: wall.back_side_def.is_some(),
             back_sector: wall.back_side_def.as_ref().map(|s| s.facing),
+            ray_index: index,
+        }
+    })
+}
+
+pub fn get_hit_sector_recursive(
+    origin: Vec2, // CHANGED: explicit origin instead of deriving from transform
+    angle: f32, // CHANGED: pass the precomputed world angle directly
+    offset: f32, // CHANGED: pass the precomputed offset directly
+    view_info: &ViewInfo,
+    sector_index: usize,
+    map: &Map,
+    index: usize
+) -> Option<WallHit> {
+    let end = origin + Vec2::new(angle.cos(), angle.sin()) * view_info.max_distance;
+    let ray = Ray { start: origin, sec_point: end };
+
+    let mut nearest_hit: Option<(Vec2, WallId)> = None;
+    let mut nearest_dist_sq = f32::MAX;
+
+    for wall in &map.sectors[sector_index].walls {
+        if let Some(hit) = ray_hit(&ray, wall) {
+            let dist_sq = origin.distance_squared(hit);
+            if dist_sq < nearest_dist_sq {
+                nearest_dist_sq = dist_sq;
+                nearest_hit = Some((hit, wall.id));
+            }
+        }
+    }
+
+    nearest_hit.map(|(pos, wall_id)| {
+        let raw_dist = nearest_dist_sq.sqrt();
+        let perp_dist = raw_dist * offset.cos();
+        let wall = &map.sectors[sector_index].walls[wall_id.index];
+        WallHit {
+            pos,
+            perp_dist,
+            sector_id: wall_id.sector,
+            room_sector_id: sector_index,
+            wall_id,
+            is_portal: wall.back_side_def.is_some(),
+            back_sector: wall.back_side_def.as_ref().map(|s| s.facing),
+            ray_index: index,
         }
     })
 }

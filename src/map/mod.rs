@@ -16,17 +16,30 @@ pub struct Sector {
     pub id: usize,
 }
 
+/// Unique identifier for a wall: sector + index within that sector
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct WallId {
+    pub sector: usize,
+    pub index: usize,
+}
+
+impl WallId {
+    pub fn new(sector: usize, index: usize) -> Self {
+        Self { sector, index }
+    }
+}
+
 pub struct LineDef {
     pub start: Vec2,
     pub end: Vec2,
     pub front_side_def: SideDef,
     pub back_side_def: Option<SideDef>,
-    pub id: f32,
+    pub id: WallId,
 }
 
 pub struct SideDef {
     pub textures: SideDefTextures,
-    //Sector the side def is facing
+    /// Sector the side def is facing
     pub facing: usize,
 }
 
@@ -65,18 +78,19 @@ pub fn rect_sector(
 }
 
 //--------------LINE DEF BUILDING FUNCTIONS-------------
-pub fn wall(x0: f32, y0: f32, x1: f32, y1: f32, texture: Handle<Image>, id: f32) -> LineDef {
+pub fn wall(x0: f32, y0: f32, x1: f32, y1: f32, texture: Handle<Image>, id: WallId) -> LineDef {
     LineDef {
         start: Vec2::new(x0, y0),
         end: Vec2::new(x1, y1),
         front_side_def: SideDef::new(
             SideDefTextures { upper: None, middle: Some(texture), lower: None },
-            id.trunc() as usize
+            id.sector
         ),
         back_side_def: None,
         id,
     }
 }
+
 pub fn portal(
     x0: f32,
     y0: f32,
@@ -84,7 +98,7 @@ pub fn portal(
     y1: f32,
     upper_texture: Handle<Image>,
     lower_texture: Handle<Image>,
-    id: f32,
+    id: WallId,
     front_sector: usize,
     back_sector: usize
 ) -> LineDef {
@@ -154,25 +168,28 @@ impl SectorBuilder {
         y0: f32,
         x1: f32,
         y1: f32,
-        id: usize,
+        wall_index: usize,
         texture: Handle<Image>
     ) -> Self {
-        let wall = wall(x0, y0, x1, y1, texture, (self.id as f32) + (id as f32));
+        let wall_id = WallId::new(self.id, wall_index);
+        let wall = wall(x0, y0, x1, y1, texture, wall_id);
         self.walls.push(wall);
         self
     }
+
     pub fn portal(
         mut self,
         x0: f32,
         y0: f32,
         x1: f32,
         y1: f32,
-        id: usize,
+        wall_index: usize,
         upper_texture: Handle<Image>,
         lower_texture: Handle<Image>,
         front_sector: usize,
         back_sector: usize
     ) -> Self {
+        let wall_id = WallId::new(self.id, wall_index);
         let portal = portal(
             x0,
             y0,
@@ -180,7 +197,7 @@ impl SectorBuilder {
             y1,
             upper_texture,
             lower_texture,
-            (self.id as f32) + (id as f32),
+            wall_id,
             front_sector,
             back_sector
         );

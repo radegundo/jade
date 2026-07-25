@@ -4,7 +4,7 @@ use map::*;
 
 struct Ray {
     start: Vec2,
-    //Sample a point in the direction of the ray
+    // Sample a point in the direction of the ray
     sec_point: Vec2,
 }
 
@@ -13,7 +13,7 @@ pub struct WallHit {
     pub perp_dist: f32,
     pub sector_id: usize,
     pub room_sector_id: usize,
-    pub wall_id: f32,
+    pub wall_id: WallId,
     pub is_portal: bool,
     pub back_sector: Option<usize>,
 }
@@ -38,7 +38,7 @@ pub fn get_ray_offset(ray_index: usize, view_info: &ViewInfo) -> f32 {
     -half_fov + angle_step * (ray_index as f32)
 }
 
-//RAY HIT MATHS
+// RAY HIT MATHS
 fn ray_hit(ray: &Ray, wall: &LineDef) -> Option<Vec2> {
     let (x1, y1) = (ray.start.x, ray.start.y);
     let (x2, y2) = (ray.sec_point.x, ray.sec_point.y);
@@ -67,14 +67,14 @@ pub fn get_hit_sector(
     index: usize
 ) -> Option<WallHit> {
     let origin = transform.translation.truncate();
-    let angle = get_ray_angle(index, &transform, view_info);
+    let angle = get_ray_angle(index, transform, view_info);
     let offset = get_ray_offset(index, view_info);
     let start = transform.translation;
     let end = start + Vec3::new(angle.cos(), angle.sin(), 0.0) * view_info.max_distance;
     let ray = Ray { start: start.truncate(), sec_point: end.truncate() };
 
-    // (pos, line_def, sector_type, resolved_id)
-    let mut nearest_hit: Option<(Vec2, f32, usize)> = None;
+    // (pos, wall_id, sector_index)
+    let mut nearest_hit: Option<(Vec2, WallId)> = None;
     let mut nearest_dist_sq = f32::MAX;
 
     for wall in &map.sectors[sector_index].walls {
@@ -82,30 +82,24 @@ pub fn get_hit_sector(
             let dist_sq = origin.distance_squared(hit);
             if dist_sq < nearest_dist_sq {
                 nearest_dist_sq = dist_sq;
-                nearest_hit = Some((hit, wall.id, sector_index));
+                nearest_hit = Some((hit, wall.id));
             }
         }
     }
 
-    nearest_hit.map(|(pos, line_def, id)| {
+    nearest_hit.map(|(pos, wall_id)| {
         let raw_dist = nearest_dist_sq.sqrt();
         let perp_dist = raw_dist * offset.cos();
+        let wall = &map.sectors[sector_index].walls[wall_id.index];
+
         WallHit {
             pos,
             perp_dist,
-            sector_id: id, // now correct for both cases
+            sector_id: wall_id.sector,
             room_sector_id: sector_index,
-            wall_id: line_def,
-            is_portal: map.sectors[sector_index].walls
-                .iter()
-                .find(|w| w.id == line_def)
-                .and_then(|w| w.back_side_def.as_ref())
-                .is_some(),
-            back_sector: map.sectors[sector_index].walls
-                .iter()
-                .find(|w| w.id == line_def)
-                .and_then(|w| w.back_side_def.as_ref())
-                .map(|s| s.facing),
+            wall_id,
+            is_portal: wall.back_side_def.is_some(),
+            back_sector: wall.back_side_def.as_ref().map(|s| s.facing),
         }
     })
 }

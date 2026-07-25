@@ -37,6 +37,7 @@ pub fn render_2d(
 pub fn render(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     player_cache: Res<PlayerCameraCache>,
     map: Res<Map>,
     view_info: Res<ViewInfo>,
@@ -62,12 +63,25 @@ pub fn render(
         for i in 0..min(needed, pool_size) {
             let entity = pool.entities[i];
             let hit_group = &grouped_hits[i];
-            let sector = &map.sectors[hit_group[0].sector_id];
-            let mesh = build_wall_mesh(hit_group, sector);
-            commands
-                .entity(entity)
-                .insert(Visibility::Visible)
-                .insert(Mesh3d(meshes.add(mesh)));
+            if !hit_group[0].is_portal {
+                let id = hit_group[0].wall_id;
+                let wall_index = id.index; // let mesh = build_wall_mesh(hit_group, sector);
+                let sector_index = id.sector;
+                let sector = &map.sectors[sector_index];
+                let wall = &sector.walls[wall_index];
+                let mesh = build_wall_mesh(&hit_group, &wall, &sector);
+                let material = StandardMaterial {
+                    base_color_texture: map.sectors[sector_index].walls[
+                        wall_index
+                    ].front_side_def.textures.middle.clone(),
+                    ..default()
+                };
+                commands
+                    .entity(entity)
+                    .insert(Visibility::Visible)
+                    .insert(Mesh3d(meshes.add(mesh)))
+                    .insert(MeshMaterial3d(materials.add(material)));
+            }
         }
         //3. HIDE NOT NEEDED ENTITIES
         for i in needed..pool.used.min(pool_size) {
@@ -80,12 +94,16 @@ pub fn render(
         if needed > pool_size {
             for i in pool_size..needed {
                 let hit_group = &grouped_hits[i];
-                let sector = &map.sectors[hit_group[0].sector_id];
+                let id = hit_group[0].wall_id;
+                let wall_index = id.index; // let mesh = build_wall_mesh(hit_group, sector);
+                let sector_index = id.sector;
+                let sector = &map.sectors[sector_index];
+                let wall = &sector.walls[wall_index];
 
                 let entity = commands
                     .spawn((
                         Visibility::Visible,
-                        Mesh2d(meshes.add(build_wall_mesh(hit_group, sector))),
+                        Mesh3d(meshes.add(build_wall_mesh(hit_group, &wall, &sector))),
                         // MeshMaterial2d(materials.add(build_wall_material(hit_group, sector))),
                         Transform::default(),
                     ))
@@ -130,9 +148,29 @@ fn project_height(world_height: f32, dist: f32, view_info: &ViewInfo) -> f32 {
     (relative * view_info.view_distance) / dist + view_info.pitch
 }
 
-pub fn build_wall_mesh(hit_group: &Vec<WallHit>, sector: &Sector) -> Mesh {
+pub fn build_wall_mesh(hit_group: &Vec<WallHit>, wall: &LineDef, sector: &Sector) -> Mesh {
     // TODO: Implement mesh building logic based on the hit group and sector information
-    let mesh = Mesh::new(bevy::mesh::PrimitiveTopology::TriangleList, RenderAssetUsages::default());
+    let start = &hit_group[0];
+    let end = &hit_group[hit_group.len() - 1];
+    let positions = vec![
+        [start.pos.x, start.pos.y, sector.floor_height],
+        [end.pos.x, end.pos.y, sector.floor_height],
+        [end.pos.x, end.pos.y, sector.ceiling_height],
+        [start.pos.x, start.pos.y, sector.ceiling_height]
+    ];
+    let normal = wall_normal(wall).extend(0.0);
+    let normals = vec![
+        [normal.x, normal.y, normal.z],
+        [normal.x, normal.y, normal.z],
+        [normal.x, normal.y, normal.z],
+        [normal.x, normal.y, normal.z]
+    ];
+    let uvs = vec![[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]];
+    let mesh = Mesh::new(bevy::mesh::PrimitiveTopology::TriangleList, RenderAssetUsages::default())
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+        .with_inserted_indices(Indices::U32(vec![0, 2, 1, 0, 3, 2]));
     mesh
 }
 

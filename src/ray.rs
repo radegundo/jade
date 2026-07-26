@@ -9,17 +9,17 @@ struct Ray {
     sec_point: Vec2,
 }
 
+#[derive(Clone)]
 pub struct WallHit {
-    pub pos: Vec2,
-    pub perp_dist: f32,
-    pub sector_id: usize,
-    pub room_sector_id: usize,
-    pub wall_id: WallId,
-    pub is_portal: bool,
-    pub back_sector: Option<usize>,
-    pub ray_index: usize,
+    pub pos: Vec2, // The 2D world position where the ray intersected a wall
+    pub perp_dist: f32, // Distance from player to hit point, perpendicular to view plane
+    pub sector_id: usize, // ID of the sector that the wall belongs to
+    pub room_sector_id: usize, // ID of the sector the ray started in (the "room")
+    pub wall_id: WallId, // Unique identifier for the specific wall that was hit
+    pub is_portal: bool, // Whether this wall is a portal (leads to another sector)
+    pub back_sector: Option<usize>, // If it's a portal, which sector does it lead to?
+    pub ray_index: usize, // Which ray (1-N) from the player this hit came from
 }
-
 // ----------------------HELPER FUNCTIONS---------------------------
 pub fn get_ray_angle(ray_index: usize, transform: &Transform, view_info: &ViewInfo) -> f32 {
     let player_angle = transform.rotation.to_euler(EulerRot::XYZ).2;

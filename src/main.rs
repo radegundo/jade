@@ -6,7 +6,7 @@ use bevy::{
     window::{ PresentMode, WindowRef, WindowResolution },
 };
 
-use crate::{ input::OwnInputPlugin, map::MapPlugin, render::RenderPlugin };
+use crate::{ input::OwnInputPlugin, map::{ Map, MapPlugin }, render::RenderPlugin };
 
 mod ray;
 mod map;

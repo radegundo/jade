@@ -1,6 +1,6 @@
 use bevy::{ camera::visibility::RenderLayers, prelude::* };
 
-use crate::map::relative_map::RelativeMapPlugin;
+use crate::{ EYE_OFFSET, PlayerCameraCache, ViewInfo, map::relative_map::RelativeMapPlugin };
 
 pub mod relative_map;
 
@@ -10,6 +10,7 @@ impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_gizmo_layers)
             .add_systems(Startup, setup_map)
+            .add_systems(Update, update_eye_height)
             .init_gizmo_group::<MapGizmos>()
             .add_plugins(RelativeMapPlugin);
     }
@@ -275,6 +276,25 @@ pub fn find_player_sector(player_pos: Vec2, map: &Map) -> Option<usize> {
     }
     None
 }
+
+pub fn update_eye_height(
+    player_cache: Res<PlayerCameraCache>,
+    map: Res<Map>,
+    mut view_info: ResMut<ViewInfo>,
+    time: Res<Time>
+) {
+    let pos = player_cache.transform.translation.truncate();
+
+    if let Some(sector_idx) = find_player_sector(pos, &map) {
+        let sector = &map.sectors[sector_idx];
+        let target_eye_height = sector.floor_height + EYE_OFFSET;
+
+        let speed = 8.0; // higher = snappier transition
+        view_info.eye_height =
+            view_info.eye_height +
+            (target_eye_height - view_info.eye_height) * (speed * time.delta_secs()).min(1.0);
+    }
+}
 //-------------- MAP FUNCTIONS------------------------
 
 pub fn test_map(asset_server: Res<AssetServer>) -> Map {
@@ -307,7 +327,7 @@ pub fn test_map(asset_server: Res<AssetServer>) -> Map {
             // Sector 1: Corridor/room to the right of the portal
             // Extends from x=100 to x=140, y=40 to y=60
             // Portal is the LEFT edge (x=100), shared with sector 0
-            SectorBuilder::new(1, 0.0, 20.0, floor_tex.clone(), ceil_tex.clone())
+            SectorBuilder::new(1, 10.0, 20.0, floor_tex.clone(), ceil_tex.clone())
                 .wall(100.0, 40.0, 140.0, 40.0, 0, wall_tex.clone()) // Bottom: (100,40) → (140,40)
                 .wall(140.0, 40.0, 140.0, 60.0, 1, wall_tex.clone()) // Right: (140,40) → (140,60)
                 .wall(140.0, 60.0, 100.0, 60.0, 2, wall_tex.clone()) // Top: (140,60) → (100,60)

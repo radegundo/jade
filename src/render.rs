@@ -12,7 +12,8 @@ impl Plugin for RenderPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, render)
             .add_systems(Update, render_2d)
-            .insert_resource(WallEntityPool::default());
+            .insert_resource(WallEntityPool::default())
+            .insert_resource(PortalBoundaryEntityPool::default());
     }
 }
 //------------------MAIN RENDER FUNCTIONS------------------------
@@ -51,7 +52,8 @@ pub fn render(
     player_cache: Res<PlayerCameraCache>,
     map: Res<Map>,
     view_info: Res<ViewInfo>,
-    mut pool: ResMut<WallEntityPool>,
+    mut wall_pool: ResMut<WallEntityPool>,
+    mut portal_pool: ResMut<PortalBoundaryEntityPool>,
     mut query: Query<&mut Visibility>
 ) {
     let transform = &player_cache.transform;
@@ -59,7 +61,7 @@ pub fn render(
     if let Some(player_sector_index) = find_player_sector(transform.translation.truncate(), &map) {
         // 1. Collect ALL visible wall groups from ALL sectors via portal recursion
         let mut all_groups: Vec<WallGroup> = Vec::new();
-        let mut visited: HashSet<usize> = HashSet::new();
+        let mut portal_boundary_groups: Vec<PortalBoundaryGroup> = Vec::new();
 
         let initial_origins: Vec<(usize, Vec2)> = (0..RAY_COUNT)
             .map(|i| (i, transform.translation.truncate()))
@@ -74,7 +76,8 @@ pub fn render(
             &map,
             &initial_origins,
             &mut visited_per_ray,
-            &mut all_groups
+            &mut all_groups,
+            &mut portal_boundary_groups
         );
 
         // 2. Render all collected wall groups using the pool
@@ -82,9 +85,17 @@ pub fn render(
             &mut commands,
             &mut meshes,
             &mut materials,
-            &mut pool,
+            &mut wall_pool,
             &mut query,
             &all_groups
+        );
+        render_portal_boundary_groups(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &mut portal_pool,
+            &mut query,
+            &portal_boundary_groups
         );
     }
 }
@@ -94,10 +105,10 @@ fn recurse_sector(
     view_info: &ViewInfo,
     sector_index: usize,
     map: &Map,
-    // CHANGED: carry per-ray origins instead of a flat range once you're past the first sector
     ray_origins: &[(usize, Vec2)], // (ray_index, origin) pairs
     visited_per_ray: &mut HashMap<usize, HashSet<usize>>, // per-ray visited sectors, not global
-    all_groups: &mut Vec<WallGroup>
+    all_groups: &mut Vec<WallGroup>,
+    portal_boundary_groups: &mut Vec<PortalBoundaryGroup>
 ) {
     let mut hits: Vec<WallHit> = Vec::new();
 
@@ -134,14 +145,37 @@ fn recurse_sector(
         if group.is_empty() {
             continue;
         }
+        let front_sector = &map.sectors[sector_index];
+        let wall = front_sector.walls[group[0].wall_id.index].clone();
 
         if group[0].is_portal {
-            if let Some(back) = group[0].back_sector {
+            if let Some(back_sector_id) = group[0].back_sector {
+                let back_sector = &map.sectors[back_sector_id];
+
+                //CHECK FOR LOWER BOUNDARY
+                let has_lower =
+                    map.sectors[back_sector_id].floor_height > front_sector.floor_height;
+
+                //CHECK FOR UPPER BOUNDARY
+                let has_upper =
+                    map.sectors[back_sector_id].ceiling_height < front_sector.ceiling_height;
+
+                if has_lower || has_upper {
+                    portal_boundary_groups.push(PortalBoundaryGroup {
+                        hits: group.clone(),
+                        wall: wall.clone(),
+                        front_sector: front_sector.clone(),
+                        back_sector: back_sector.clone(),
+                        has_upper,
+                        has_lower,
+                    });
+                }
+
                 for hit in &group {
                     let angle = get_ray_angle(hit.ray_index, player_transform, view_info);
                     let dir = Vec2::new(angle.cos(), angle.sin());
                     let nudged = hit.pos + dir * 0.05; // NUDGE past the portal edge
-                    portal_next.entry(back).or_default().push((hit.ray_index, nudged));
+                    portal_next.entry(back_sector_id).or_default().push((hit.ray_index, nudged));
                 }
             }
         } else {
@@ -159,11 +193,13 @@ fn recurse_sector(
             map,
             &origins,
             visited_per_ray,
-            all_groups
+            all_groups,
+            portal_boundary_groups
         );
     }
 }
 
+// --------------WALL RENDERING---------------------
 struct WallGroup {
     hits: Vec<WallHit>,
     wall: LineDef, // cloned or referenced
@@ -224,6 +260,151 @@ fn render_wall_groups(
     pool.used = needed;
 }
 
+//--------------------------------PORTAL BOUNDARY RENDERING---------------------------
+struct PortalBoundaryGroup {
+    hits: Vec<WallHit>,
+    wall: LineDef,
+    front_sector: Sector,
+    back_sector: Sector,
+    has_upper: bool,
+    has_lower: bool,
+}
+
+fn render_portal_boundary_groups(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    pool: &mut ResMut<PortalBoundaryEntityPool>,
+    query: &mut Query<&mut Visibility>,
+    groups: &[PortalBoundaryGroup]
+) {
+    let needed = groups.len();
+    let pool_size = pool.entities.len();
+
+    // 1. Activate/reuse pool entities
+    for i in 0..min(needed, pool_size) {
+        let (upper_entity, lower_entity) = pool.entities[i];
+        let group = &groups[i];
+
+        if group.has_upper {
+            let upper_mesh = build_portal_boundary_mesh(
+                &group.hits,
+                &group.wall,
+                group.back_sector.ceiling_height, // bottom of upper boundary
+                group.front_sector.ceiling_height // top of upper boundary
+            );
+            let upper_material = StandardMaterial {
+                base_color_texture: group.wall.front_side_def.textures.upper.clone(),
+                ..default()
+            };
+
+            commands
+                .entity(upper_entity)
+                .insert(Visibility::Visible)
+                .insert(Mesh3d(meshes.add(upper_mesh)))
+                .insert(MeshMaterial3d(materials.add(upper_material)));
+        } else {
+            if let Ok(mut vis) = query.get_mut(upper_entity) {
+                *vis = Visibility::Hidden;
+            }
+        }
+
+        // Handle LOWER boundary
+        if group.has_lower {
+            let lower_mesh = build_portal_boundary_mesh(
+                &group.hits,
+                &group.wall,
+                group.front_sector.floor_height, // bottom of lower boundary
+                group.back_sector.floor_height // top of lower boundary
+            );
+            let lower_material = StandardMaterial {
+                base_color_texture: group.wall.front_side_def.textures.lower.clone(),
+                ..default()
+            };
+
+            commands
+                .entity(lower_entity)
+                .insert(Visibility::Visible)
+                .insert(Mesh3d(meshes.add(lower_mesh)))
+                .insert(MeshMaterial3d(materials.add(lower_material)));
+        } else {
+            if let Ok(mut vis) = query.get_mut(lower_entity) {
+                *vis = Visibility::Hidden;
+            }
+        }
+    }
+
+    // 2. Hide unused entities
+    for i in needed..pool.used.min(pool_size) {
+        let (upper_entity, lower_entity) = pool.entities[i];
+        if let Ok(mut vis) = query.get_mut(upper_entity) {
+            *vis = Visibility::Hidden;
+        }
+        if let Ok(mut vis) = query.get_mut(lower_entity) {
+            *vis = Visibility::Hidden;
+        }
+    }
+
+    // 3. Spawn overflow
+    if needed > pool_size {
+        for i in pool_size..needed {
+            let group = &groups[i];
+
+            // Spawn upper entity
+            let upper_entity = if group.has_upper {
+                let upper_mesh = build_portal_boundary_mesh(
+                    &group.hits,
+                    &group.wall,
+                    group.back_sector.ceiling_height,
+                    group.front_sector.ceiling_height
+                );
+                let upper_material = StandardMaterial {
+                    base_color_texture: group.wall.front_side_def.textures.upper.clone(),
+                    ..default()
+                };
+                commands
+                    .spawn((
+                        Visibility::Visible,
+                        Mesh3d(meshes.add(upper_mesh)),
+                        MeshMaterial3d(materials.add(upper_material)),
+                        Transform::default(),
+                    ))
+                    .id()
+            } else {
+                commands.spawn((Visibility::Hidden, Transform::default())).id()
+            };
+
+            // Spawn lower entity
+            let lower_entity = if group.has_lower {
+                let lower_mesh = build_portal_boundary_mesh(
+                    &group.hits,
+                    &group.wall,
+                    group.front_sector.floor_height,
+                    group.back_sector.floor_height
+                );
+                let lower_material = StandardMaterial {
+                    base_color_texture: group.wall.front_side_def.textures.lower.clone(),
+                    ..default()
+                };
+                commands
+                    .spawn((
+                        Visibility::Visible,
+                        Mesh3d(meshes.add(lower_mesh)),
+                        MeshMaterial3d(materials.add(lower_material)),
+                        Transform::default(),
+                    ))
+                    .id()
+            } else {
+                commands.spawn((Visibility::Hidden, Transform::default())).id()
+            };
+
+            pool.entities.push((upper_entity, lower_entity));
+        }
+    }
+
+    pool.used = needed;
+}
+
 //-------------------------------RESOURCES-------------------------------
 
 #[derive(Resource)]
@@ -233,6 +414,20 @@ pub struct WallEntityPool {
 }
 
 impl Default for WallEntityPool {
+    fn default() -> Self {
+        Self {
+            entities: Vec::with_capacity(64), // pre-allocate
+            used: 0,
+        }
+    }
+}
+#[derive(Resource)]
+pub struct PortalBoundaryEntityPool {
+    pub entities: Vec<(Entity, Entity)>,
+    pub used: usize,
+}
+
+impl Default for PortalBoundaryEntityPool {
     fn default() -> Self {
         Self {
             entities: Vec::with_capacity(64), // pre-allocate
@@ -274,6 +469,47 @@ pub fn build_wall_mesh(hit_group: &[WallHit], wall: &LineDef, sector: &Sector) -
     let normals = vec![[normal.x, normal.y, normal.z]; 4];
 
     // UVs anchored to world-space position on the wall
+    let uvs = vec![
+        [u0, 1.0], // bottom-left
+        [u1, 1.0], // bottom-right
+        [u1, 0.0], // top-right
+        [u0, 0.0] // top-left
+    ];
+
+    Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+        .with_inserted_indices(Indices::U32(vec![0, 2, 1, 0, 3, 2]))
+}
+
+pub fn build_portal_boundary_mesh(
+    hit_group: &[WallHit],
+    wall: &LineDef,
+    floor_height: f32,
+    ceiling_height: f32
+) -> Mesh {
+    let start = hit_group.first().unwrap();
+    let end = hit_group.last().unwrap();
+
+    let p0 = start.pos;
+    let p1 = end.pos;
+
+    let wall_length = wall.start.distance(wall.end);
+    let u0 = p0.distance(wall.start) / wall_length;
+    let u1 = p1.distance(wall.start) / wall_length;
+
+    let positions = vec![
+        [p0.x, p0.y, floor_height],
+        [p1.x, p1.y, floor_height],
+        [p1.x, p1.y, ceiling_height],
+        [p0.x, p0.y, ceiling_height]
+    ];
+
+    let normal = wall_normal(wall).extend(0.0);
+    let normals = vec![[normal.x, normal.y, normal.z]; 4];
+
+    // FIX 2: Use normalized 0.0..=1.0 UVs, matching build_wall_mesh exactly
     let uvs = vec![
         [u0, 1.0], // bottom-left
         [u1, 1.0], // bottom-right

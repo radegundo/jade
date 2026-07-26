@@ -7,6 +7,7 @@ use crate::map::*;
 use crate::*;
 
 //------------------PLUGIN---------------------------------------
+
 pub struct RenderPlugin;
 impl Plugin for RenderPlugin {
     fn build(&self, app: &mut App) {
@@ -22,23 +23,25 @@ impl Plugin for RenderPlugin {
 
 //------------------OBSTACLE STARTUP SPAWNING--------------------
 
-/// Key for identifying a specific obstacle edge
+/// Uniquely identifies one edge of one obstacle in one sector.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct ObstacleEdgeKey {
+pub(crate) struct ObstacleEdgeKey {
     sector_id: usize,
     obstacle_id: usize,
     edge_index: usize,
 }
 
-/// Stores pre-spawned obstacle entities. Built once at startup.
+/// Resource that holds the pre-spawned entity for every obstacle edge.
+/// Built once at PostStartup, never modified.
 #[derive(Resource, Default)]
-struct ObstacleEntities {
-    /// Maps each obstacle edge to its pre-spawned entity
-    edges: HashMap<ObstacleEdgeKey, Entity>,
+pub(crate) struct ObstacleEntities {
+    pub(crate) edges: HashMap<ObstacleEdgeKey, Entity>,
 }
 
-/// Runs once after startup. Builds meshes for every obstacle edge
-/// and spawns them as Hidden entities.
+/// Runs once after startup.
+/// For every obstacle edge in the map, builds the full mesh and spawns
+/// a Hidden entity. Each entity is stored by ObstacleEdgeKey.
+/// The render system only toggles Visibility — no mesh work at runtime.
 fn spawn_obstacle_entities(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -64,18 +67,17 @@ fn spawn_obstacle_entities(
                     ))
                     .id();
 
-                let key = ObstacleEdgeKey {
-                    sector_id: sector.id,
-                    obstacle_id: obstacle.id,
-                    edge_index,
-                };
-                obstacle_entities.edges.insert(key, entity);
+                obstacle_entities.edges.insert(
+                    ObstacleEdgeKey { sector_id: sector.id, obstacle_id: obstacle.id, edge_index },
+                    entity
+                );
             }
         }
     }
 }
 
 //------------------MAIN RENDER FUNCTIONS------------------------
+
 pub fn render_2d(
     mut gizmos: Gizmos<MapGizmos>,
     map: Res<Map>,
@@ -84,17 +86,17 @@ pub fn render_2d(
 ) {
     let transform = transform_query.single().unwrap();
     for i in 0..RAY_COUNT {
-        if let Some(sector) = find_player_sector(transform.translation.truncate(), &map) {
-            let sector = &map.sectors[sector];
+        if let Some(sector_idx) = find_player_sector(transform.translation.truncate(), &map) {
+            let sector = &map.sectors[sector_idx];
             if let Some(hit) = get_hit_sector(&transform, &view_info, sector.id, &map, i) {
                 let x = hit_to_screen_x(&view_info, i);
                 let window_top = project_height(
-                    map.sectors[sector.id].ceiling_height - EYE_OFFSET,
+                    sector.ceiling_height - EYE_OFFSET,
                     hit.perp_dist,
                     &view_info
                 );
                 let window_bottom = project_height(
-                    map.sectors[sector.id].floor_height - EYE_OFFSET,
+                    sector.floor_height - EYE_OFFSET,
                     hit.perp_dist,
                     &view_info
                 );
@@ -146,9 +148,7 @@ pub fn render(
 
         let viss_groups: Vec<VissGroup> = visited_sectors
             .iter()
-            .map(|&sector_id| VissGroup {
-                sector: map.sectors[sector_id].clone(),
-            })
+            .map(|&sector_id| VissGroup { sector: map.sectors[sector_id].clone() })
             .collect();
 
         render_wall_groups(
@@ -176,20 +176,20 @@ pub fn render(
             &viss_groups
         );
 
-        // Obstacle rendering: just toggle visibility on pre-spawned entities
+        // Toggle obstacle visibility — no mesh work, just Visible/Hidden
         for (key, &entity) in obstacle_entities.edges.iter() {
-            if visible_obstacles.contains(key) {
-                if let Ok(mut vis) = query.get_mut(entity) {
-                    *vis = Visibility::Visible;
-                }
-            } else {
-                if let Ok(mut vis) = query.get_mut(entity) {
-                    *vis = Visibility::Hidden;
-                }
+            if let Ok(mut vis) = query.get_mut(entity) {
+                *vis = if visible_obstacles.contains(key) {
+                    Visibility::Visible
+                } else {
+                    Visibility::Hidden
+                };
             }
         }
     }
 }
+
+//------------------SECTOR RECURSION-----------------------------
 
 fn recurse_sector(
     player_transform: &Transform,
@@ -230,7 +230,7 @@ fn recurse_sector(
         {
             let max_dist_sq = origin.distance_squared(hit.pos);
 
-            // Check each obstacle in this sector for visibility
+            // Check each obstacle — if any ray reaches it, mark its edges visible
             let sector = &map.sectors[sector_index];
             for obstacle in &sector.obstacles {
                 if
@@ -244,11 +244,11 @@ fn recurse_sector(
                         obstacle.id
                     )
                 {
-                    // Find which edge was hit to mark the correct key
+                    // Mark every visible edge of this obstacle
                     let end = origin + Vec2::new(angle.cos(), angle.sin()) * view_info.max_distance;
-                    let ray = crate::ray::make_ray(origin, end);
+                    let ray = make_ray(origin, end);
                     for (edge_index, edge) in obstacle.edges.iter().enumerate() {
-                        if crate::ray::test_ray_hit(&ray, edge, origin, max_dist_sq) {
+                        if test_ray_hit(&ray, edge, origin, max_dist_sq) {
                             visible_obstacles.insert(ObstacleEdgeKey {
                                 sector_id: sector_index,
                                 obstacle_id: obstacle.id,
@@ -263,6 +263,7 @@ fn recurse_sector(
         }
     }
 
+    // Group consecutive wall hits by wall_id
     let grouped = group_hits_by_wall(wall_hits);
     let mut portal_next: HashMap<usize, Vec<(usize, Vec2)>> = HashMap::new();
 
@@ -270,6 +271,7 @@ fn recurse_sector(
         if group.is_empty() {
             continue;
         }
+
         let front_sector = &map.sectors[sector_index];
         let wall = front_sector.walls[group[0].wall_id.index].clone();
 
@@ -302,7 +304,6 @@ fn recurse_sector(
             all_groups.push(WallGroup {
                 hits: group,
                 wall,
-                sector: front_sector.clone(),
             });
         }
     }
@@ -323,11 +324,11 @@ fn recurse_sector(
     }
 }
 
-// --------------WALL RENDERING---------------------
+//------------------WALL RENDERING---------------------
+
 struct WallGroup {
     hits: Vec<WallHit>,
     wall: LineDef,
-    sector: Sector,
 }
 
 fn render_wall_groups(
@@ -341,6 +342,7 @@ fn render_wall_groups(
     let needed = groups.len();
     let pool_size = pool.entities.len();
 
+    // Reuse existing pool slots — overwrite mesh data in place
     for i in 0..min(needed, pool_size) {
         let (entity, ref mesh_handle) = pool.entities[i];
         let group = &groups[i];
@@ -362,6 +364,7 @@ fn render_wall_groups(
             );
     }
 
+    // Hide unused pool slots
     for i in needed..pool.used.min(pool_size) {
         let (entity, _) = pool.entities[i];
         if let Ok(mut vis) = query.get_mut(entity) {
@@ -369,6 +372,7 @@ fn render_wall_groups(
         }
     }
 
+    // Spawn new entities if pool is not large enough
     if needed > pool_size {
         for i in pool_size..needed {
             let group = &groups[i];
@@ -393,7 +397,8 @@ fn render_wall_groups(
     pool.used = needed;
 }
 
-//--------------------------------PORTAL BOUNDARY RENDERING---------------------------
+//------------------PORTAL BOUNDARY RENDERING---------------------------
+
 struct PortalBoundaryGroup {
     hits: Vec<WallHit>,
     wall: LineDef,
@@ -544,7 +549,7 @@ fn render_portal_boundary_groups(
     pool.used = needed;
 }
 
-//----------VISS PLANES RENDERING------------------
+//------------------VISS PLANES (FLOORS AND CEILINGS)------------------
 
 struct VissGroup {
     sector: Sector,
@@ -563,8 +568,7 @@ fn render_viss_groups(
 
     for i in 0..min(needed, pool_size) {
         let (ceil_entity, ref ceil_mesh, floor_entity, ref floor_mesh) = pool.entities[i];
-        let group = &groups[i];
-        let sector = &group.sector;
+        let sector = &groups[i].sector;
 
         if let Some(mut existing) = meshes.get_mut(ceil_mesh) {
             *existing = build_viss_mesh(sector, sector.ceiling_height, false);
@@ -609,8 +613,7 @@ fn render_viss_groups(
 
     if needed > pool_size {
         for i in pool_size..needed {
-            let group = &groups[i];
-            let sector = &group.sector;
+            let sector = &groups[i].sector;
 
             let ceil_mesh_handle = meshes.add(
                 build_viss_mesh(sector, sector.ceiling_height, false)
@@ -651,10 +654,11 @@ fn render_viss_groups(
     pool.used = needed;
 }
 
-//-------------------------------RESOURCES-------------------------------
+//------------------RESOURCES-------------------------------
 
 #[derive(Resource)]
 pub struct WallEntityPool {
+    /// (entity, mesh_handle) — mesh_handle lets us overwrite in place
     pub entities: Vec<(Entity, Handle<Mesh>)>,
     pub used: usize,
 }
@@ -667,6 +671,7 @@ impl Default for WallEntityPool {
 
 #[derive(Resource)]
 pub struct PortalBoundaryEntityPool {
+    /// (upper_entity, upper_mesh, lower_entity, lower_mesh)
     pub entities: Vec<(Entity, Handle<Mesh>, Entity, Handle<Mesh>)>,
     pub used: usize,
 }
@@ -679,6 +684,7 @@ impl Default for PortalBoundaryEntityPool {
 
 #[derive(Resource)]
 pub struct VissEntityPool {
+    /// (ceil_entity, ceil_mesh, floor_entity, floor_mesh)
     pub entities: Vec<(Entity, Handle<Mesh>, Entity, Handle<Mesh>)>,
     pub used: usize,
 }
@@ -689,12 +695,16 @@ impl Default for VissEntityPool {
     }
 }
 
-// ------------------------------RENDER HELPERS------------------------------
+//------------------MESH BUILDERS------------------------------
+
 fn project_height(world_height: f32, dist: f32, view_info: &ViewInfo) -> f32 {
     let relative = world_height - view_info.eye_height;
     (relative * view_info.view_distance) / dist + view_info.pitch
 }
 
+/// Wall mesh is built from ray hit positions (partial wall slice).
+/// bottom/top come from the hit itself so the same function works
+/// for walls at any height.
 pub fn build_wall_mesh(hit_group: &[WallHit], wall: &LineDef) -> Mesh {
     let start = hit_group.first().unwrap();
     let end = hit_group.last().unwrap();
@@ -706,14 +716,11 @@ pub fn build_wall_mesh(hit_group: &[WallHit], wall: &LineDef) -> Mesh {
     let u0 = p0.distance(wall.start) / wall_length;
     let u1 = p1.distance(wall.start) / wall_length;
 
-    let bottom = start.bottom;
-    let top = start.top;
-
     let positions = vec![
-        [p0.x, p0.y, bottom],
-        [p1.x, p1.y, bottom],
-        [p1.x, p1.y, top],
-        [p0.x, p0.y, top]
+        [p0.x, p0.y, start.bottom],
+        [p1.x, p1.y, start.bottom],
+        [p1.x, p1.y, start.top],
+        [p0.x, p0.y, start.top]
     ];
 
     let normal = wall_normal(wall).extend(0.0);
@@ -727,6 +734,9 @@ pub fn build_wall_mesh(hit_group: &[WallHit], wall: &LineDef) -> Mesh {
         .with_inserted_indices(Indices::U32(vec![0, 2, 1, 0, 3, 2]))
 }
 
+/// Portal boundary mesh fills the height gap between two sectors.
+/// floor_height/ceiling_height are passed explicitly because the
+/// boundary height range doesn't come from either sector alone.
 pub fn build_portal_boundary_mesh(
     hit_group: &[WallHit],
     wall: &LineDef,
@@ -761,8 +771,9 @@ pub fn build_portal_boundary_mesh(
         .with_inserted_indices(Indices::U32(vec![0, 2, 1, 0, 3, 2]))
 }
 
-/// Builds a full obstacle edge mesh from the LineDef geometry.
-/// Used once at startup. Never rebuilt.
+/// Obstacle mesh is built from the full LineDef geometry (not ray hits).
+/// Built once at startup and never rebuilt.
+/// UVs span 0..1 across the full edge length.
 pub fn build_obstacle_edge_mesh(edge: &LineDef, bottom: f32, top: f32) -> Mesh {
     let p0 = edge.start;
     let p1 = edge.end;
@@ -785,6 +796,8 @@ pub fn build_obstacle_edge_mesh(edge: &LineDef, bottom: f32, top: f32) -> Mesh {
         .with_inserted_indices(Indices::U32(vec![0, 2, 1, 0, 3, 2]))
 }
 
+/// Viss mesh triangulates the sector polygon at a given height.
+/// facing_up controls normal direction and triangle winding.
 pub fn build_viss_mesh(sector: &Sector, height: f32, facing_up: bool) -> Mesh {
     let vertices: Vec<Vec2> = sector.walls
         .iter()
@@ -800,7 +813,6 @@ pub fn build_viss_mesh(sector: &Sector, height: f32, facing_up: bool) -> Mesh {
         .iter()
         .map(|v| [v.x, v.y, height])
         .collect();
-
     let normal = if facing_up { [0.0, 0.0, 1.0] } else { [0.0, 0.0, -1.0] };
     let normals: Vec<[f32; 3]> = vec![normal; vertex_count];
 
@@ -820,7 +832,6 @@ pub fn build_viss_mesh(sector: &Sector, height: f32, facing_up: bool) -> Mesh {
         .iter()
         .map(|v| v.y)
         .fold(f32::NEG_INFINITY, f32::max);
-
     let range_x = max_x - min_x;
     let range_y = max_y - min_y;
 
@@ -828,8 +839,8 @@ pub fn build_viss_mesh(sector: &Sector, height: f32, facing_up: bool) -> Mesh {
         .iter()
         .map(|v| {
             let u = if range_x > 0.0 { (v.x - min_x) / range_x } else { 0.0 };
-            let v_coord = if range_y > 0.0 { (v.y - min_y) / range_y } else { 0.0 };
-            [u, v_coord]
+            let vc = if range_y > 0.0 { (v.y - min_y) / range_y } else { 0.0 };
+            [u, vc]
         })
         .collect();
 
@@ -840,6 +851,13 @@ pub fn build_viss_mesh(sector: &Sector, height: f32, facing_up: bool) -> Mesh {
         .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
         .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
         .with_inserted_indices(Indices::U32(indices))
+}
+
+//------------------GEOMETRY HELPERS------------------------------
+
+fn wall_normal(line_def: &LineDef) -> Vec2 {
+    let dir = (line_def.end - line_def.start).normalize_or_zero();
+    Vec2::new(dir.y, -dir.x)
 }
 
 fn triangulate_polygon(vertices: &[Vec2], facing_up: bool) -> Vec<u32> {
@@ -886,7 +904,6 @@ fn triangulate_polygon(vertices: &[Vec2], facing_up: bool) -> Vec<u32> {
 
             let cross = (b - a).perp_dot(c - b);
             let is_convex = if is_ccw { cross > 0.0 } else { cross < 0.0 };
-
             if !is_convex {
                 continue;
             }
@@ -902,7 +919,6 @@ fn triangulate_polygon(vertices: &[Vec2], facing_up: bool) -> Vec<u32> {
                     break;
                 }
             }
-
             if contains_point {
                 continue;
             }
@@ -960,32 +976,27 @@ fn point_in_triangle(p: Vec2, a: Vec2, b: Vec2, c: Vec2) -> bool {
     u >= 0.0 && v >= 0.0 && u + v <= 1.0
 }
 
-fn wall_normal(line_def: &LineDef) -> Vec2 {
-    let dir = (line_def.end - line_def.start).normalize_or_zero();
-    Vec2::new(dir.y, -dir.x)
-}
-
 fn group_hits_by_wall(hits: Vec<WallHit>) -> Vec<Vec<WallHit>> {
-    let mut grouped_hits: Vec<Vec<WallHit>> = Vec::new();
-    let mut current_group: Vec<WallHit> = Vec::new();
+    let mut grouped: Vec<Vec<WallHit>> = Vec::new();
+    let mut current: Vec<WallHit> = Vec::new();
 
     for hit in hits {
-        if current_group.is_empty() {
-            current_group.push(hit);
+        if current.is_empty() {
+            current.push(hit);
         } else {
-            let last_hit = current_group.last().unwrap();
-            if last_hit.wall_id == hit.wall_id && last_hit.sector_id == hit.sector_id {
-                current_group.push(hit);
+            let last = current.last().unwrap();
+            if last.wall_id == hit.wall_id && last.sector_id == hit.sector_id {
+                current.push(hit);
             } else {
-                grouped_hits.push(current_group);
-                current_group = vec![hit];
+                grouped.push(current);
+                current = vec![hit];
             }
         }
     }
 
-    if !current_group.is_empty() {
-        grouped_hits.push(current_group);
+    if !current.is_empty() {
+        grouped.push(current);
     }
 
-    grouped_hits
+    grouped
 }

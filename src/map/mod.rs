@@ -25,6 +25,7 @@ pub struct Map {
 #[derive(Clone)]
 pub struct Sector {
     pub walls: Vec<LineDef>,
+    pub obstacles: Vec<Obstacle>,
     pub floor_height: f32,
     pub ceiling_height: f32,
     pub floor_texture: Handle<Image>,
@@ -32,7 +33,16 @@ pub struct Sector {
     pub id: usize,
 }
 
-/// Unique identifier for a wall: sector + index within that sector
+#[derive(Clone)]
+pub struct Obstacle {
+    pub id: usize,
+    pub edges: Vec<LineDef>,
+    pub bottom: f32,
+    pub top: f32,
+    pub sector_id: usize,
+    pub texture: Handle<Image>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct WallId {
     pub sector: usize,
@@ -57,7 +67,6 @@ pub struct LineDef {
 #[derive(Clone)]
 pub struct SideDef {
     pub textures: SideDefTextures,
-    /// Sector the side def is facing
     pub facing: usize,
 }
 
@@ -67,7 +76,6 @@ pub struct SideDefTextures {
     pub middle: Option<Handle<Image>>,
     pub lower: Option<Handle<Image>>,
 }
-//------------MINI MAP----------------------------
 
 //-----------------------------GIZMO CONFIGS--------------------------------
 #[derive(Default, Reflect, GizmoConfigGroup)]
@@ -96,14 +104,7 @@ pub fn rect_sector(
     wall_texture: Handle<Image>,
     ceiling_texture: Handle<Image>
 ) -> Sector {
-    let mut builder = SectorBuilder::new(
-        id,
-        floor_height,
-        ceiling_height,
-        floor_texture,
-        ceiling_texture
-    );
-    builder
+    SectorBuilder::new(id, floor_height, ceiling_height, floor_texture, ceiling_texture)
         .wall(x0, y0, x1, y0, 0, wall_texture.clone())
         .wall(x1, y0, x1, y1, 1, wall_texture.clone())
         .wall(x1, y1, x0, y1, 2, wall_texture.clone())
@@ -168,9 +169,73 @@ impl SideDef {
     }
 }
 
-// ------------ API FOR BUILDING SECTORS ---------------
+// ------------ OBSTACLE BUILDER ---------------
+pub struct ObstacleBuilder {
+    edges: Vec<LineDef>,
+    bottom: f32,
+    top: f32,
+    id: usize,
+    sector_id: usize,
+    wall_counter: usize,
+    texture: Handle<Image>,
+}
+
+impl ObstacleBuilder {
+    pub fn new(id: usize, sector_id: usize, bottom: f32, top: f32, texture: Handle<Image>) -> Self {
+        Self {
+            edges: Vec::new(),
+            bottom,
+            top,
+            id,
+            sector_id,
+            wall_counter: 0,
+            texture,
+        }
+    }
+
+    pub fn edge(mut self, x0: f32, y0: f32, x1: f32, y1: f32) -> Self {
+        let wall_id = WallId::new(self.sector_id, 1000 + self.id * 100 + self.wall_counter);
+        let edge = wall(x0, y0, x1, y1, self.texture.clone(), wall_id);
+        self.edges.push(edge);
+        self.wall_counter += 1;
+        self
+    }
+
+    pub fn build(self) -> Obstacle {
+        Obstacle {
+            id: self.id,
+            edges: self.edges,
+            bottom: self.bottom,
+            top: self.top,
+            sector_id: self.sector_id,
+            texture: self.texture,
+        }
+    }
+}
+
+pub fn rect_obstacle(
+    id: usize,
+    sector_id: usize,
+    x0: f32,
+    y0: f32,
+    x1: f32,
+    y1: f32,
+    bottom: f32,
+    top: f32,
+    texture: Handle<Image>
+) -> Obstacle {
+    ObstacleBuilder::new(id, sector_id, bottom, top, texture)
+        .edge(x1, y0, x0, y0) // bottom edge
+        .edge(x0, y0, x0, y1) // left edge
+        .edge(x0, y1, x1, y1) // top edge
+        .edge(x1, y1, x1, y0) // right edge
+        .build()
+}
+
+// ------------ SECTOR BUILDER ---------------
 pub struct SectorBuilder {
     walls: Vec<LineDef>,
+    obstacles: Vec<Obstacle>,
     floor_height: f32,
     ceiling_height: f32,
     id: usize,
@@ -188,6 +253,7 @@ impl SectorBuilder {
     ) -> Self {
         SectorBuilder {
             walls: Vec::new(),
+            obstacles: Vec::new(),
             floor_height,
             ceiling_height,
             id,
@@ -206,8 +272,8 @@ impl SectorBuilder {
         texture: Handle<Image>
     ) -> Self {
         let wall_id = WallId::new(self.id, wall_index);
-        let wall = wall(x0, y0, x1, y1, texture, wall_id);
-        self.walls.push(wall);
+        let w = wall(x0, y0, x1, y1, texture, wall_id);
+        self.walls.push(w);
         self
     }
 
@@ -224,7 +290,7 @@ impl SectorBuilder {
         back_sector: usize
     ) -> Self {
         let wall_id = WallId::new(self.id, wall_index);
-        let portal = portal(
+        let p = portal(
             x0,
             y0,
             x1,
@@ -235,13 +301,34 @@ impl SectorBuilder {
             front_sector,
             back_sector
         );
-        self.walls.push(portal);
+        self.walls.push(p);
         self
+    }
+
+    pub fn obstacle(mut self, obstacle: Obstacle) -> Self {
+        self.obstacles.push(obstacle);
+        self
+    }
+
+    pub fn rect_obstacle(
+        self,
+        id: usize,
+        x0: f32,
+        y0: f32,
+        x1: f32,
+        y1: f32,
+        bottom: f32,
+        top: f32,
+        texture: Handle<Image>
+    ) -> Self {
+        let obs = rect_obstacle(id, self.id, x0, y0, x1, y1, bottom, top, texture);
+        self.obstacle(obs)
     }
 
     pub fn build(self) -> Sector {
         Sector {
             walls: self.walls,
+            obstacles: self.obstacles,
             floor_height: self.floor_height,
             ceiling_height: self.ceiling_height,
             floor_texture: self.floor_texture,
@@ -250,6 +337,7 @@ impl SectorBuilder {
         }
     }
 }
+
 //---------------SYSTEMS----------------------
 
 pub fn point_in_sector(point: Vec2, sector: &Sector) -> bool {
@@ -284,17 +372,16 @@ pub fn update_eye_height(
     time: Res<Time>
 ) {
     let pos = player_cache.transform.translation.truncate();
-
     if let Some(sector_idx) = find_player_sector(pos, &map) {
         let sector = &map.sectors[sector_idx];
         let target_eye_height = sector.floor_height + EYE_OFFSET;
-
-        let speed = 8.0; // higher = snappier transition
+        let speed = 8.0;
         view_info.eye_height =
             view_info.eye_height +
             (target_eye_height - view_info.eye_height) * (speed * time.delta_secs()).min(1.0);
     }
 }
+
 //-------------- MAP FUNCTIONS------------------------
 
 pub fn test_map(asset_server: Res<AssetServer>) -> Map {
@@ -304,64 +391,23 @@ pub fn test_map(asset_server: Res<AssetServer>) -> Map {
 
     Map {
         sectors: vec![
-            // Sector 0: Main room, 100x100, floor at 0, ceiling at 20
             SectorBuilder::new(0, 0.0, 20.0, floor_tex.clone(), ceil_tex.clone())
-                .wall(0.0, 0.0, 100.0, 0.0, 0, wall_tex.clone()) // Bottom: (0,0) → (100,0)
-                .wall(100.0, 0.0, 100.0, 40.0, 1, wall_tex.clone()) // Right lower: (100,0) → (100,40)
-                .portal(
-                    100.0,
-                    40.0, // Portal start
-                    100.0,
-                    60.0, // Portal end
-                    2, // wall index
-                    wall_tex.clone(), // upper texture
-                    wall_tex.clone(), // lower texture
-                    0, // front sector (this)
-                    1 // back sector (sector 1)
-                )
-                .wall(100.0, 60.0, 100.0, 100.0, 3, wall_tex.clone()) // Right upper: (100,60) → (100,100)
-                .wall(100.0, 100.0, 0.0, 100.0, 4, wall_tex.clone()) // Top: (100,100) → (0,100)
-                .wall(0.0, 100.0, 0.0, 0.0, 5, wall_tex.clone()) // Left: (0,100) → (0,0)
+                .wall(0.0, 0.0, 100.0, 0.0, 0, wall_tex.clone())
+                .wall(100.0, 0.0, 100.0, 40.0, 1, wall_tex.clone())
+                .portal(100.0, 40.0, 100.0, 60.0, 2, wall_tex.clone(), wall_tex.clone(), 0, 1)
+                .wall(100.0, 60.0, 100.0, 100.0, 3, wall_tex.clone())
+                .wall(100.0, 100.0, 0.0, 100.0, 4, wall_tex.clone())
+                .wall(0.0, 100.0, 0.0, 0.0, 5, wall_tex.clone())
+                .rect_obstacle(0, 40.0, 40.0, 50.0, 50.0, 0.0, 8.0, wall_tex.clone())
+                .rect_obstacle(1, 60.0, 70.0, 80.0, 90.0, 5.0, 7.0, wall_tex.clone())
                 .build(),
 
-            // Sector 1: Corridor/room to the right of the portal
-            // Extends from x=100 to x=140, y=40 to y=60
-            // Portal is the LEFT edge (x=100), shared with sector 0
             SectorBuilder::new(1, 10.0, 20.0, floor_tex.clone(), ceil_tex.clone())
-                .wall(100.0, 40.0, 140.0, 40.0, 0, wall_tex.clone()) // Bottom: (100,40) → (140,40)
-                .wall(140.0, 40.0, 140.0, 60.0, 1, wall_tex.clone()) // Right: (140,40) → (140,60)
-                .wall(140.0, 60.0, 100.0, 60.0, 2, wall_tex.clone()) // Top: (140,60) → (100,60)
-                .portal(
-                    100.0,
-                    60.0, // Portal start (top of shared edge)
-                    100.0,
-                    40.0, // Portal end (bottom of shared edge)
-                    3, // wall index
-                    wall_tex.clone(), // upper
-                    wall_tex.clone(), // lower
-                    1, // front sector (this)
-                    0 // back sector (sector 0)
-                )
+                .wall(100.0, 40.0, 140.0, 40.0, 0, wall_tex.clone())
+                .wall(140.0, 40.0, 140.0, 60.0, 1, wall_tex.clone())
+                .wall(140.0, 60.0, 100.0, 60.0, 2, wall_tex.clone())
+                .portal(100.0, 60.0, 100.0, 40.0, 3, wall_tex.clone(), wall_tex.clone(), 1, 0)
                 .build()
         ],
     }
 }
-// pub fn test_map(asset_server: Res<AssetServer>) -> Map {
-//     let texture: Handle<Image> = asset_server.load("texture.png");
-//     Map {
-//         sectors: vec![
-//             rect_sector(
-//                 0,
-//                 0.0,
-//                 0.0,
-//                 100.0,
-//                 100.0,
-//                 0.0,
-//                 10.0,
-//                 texture.clone(),
-//                 texture.clone(),
-//                 texture.clone()
-//             )
-//         ],
-//     }
-// }

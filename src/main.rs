@@ -4,9 +4,10 @@ use bevy::{
     mesh::Indices,
     prelude::*,
     window::{ PresentMode, WindowRef, WindowResolution },
+    dev_tools::fps_overlay::{ FpsOverlayConfig, FpsOverlayPlugin, FrameTimeGraphConfig },
 };
 
-use crate::{ input::OwnInputPlugin, map::{ Map, MapPlugin }, render::RenderPlugin };
+use crate::{ input::OwnInputPlugin, map::MapPlugin, render::RenderPlugin };
 
 mod ray;
 mod map;
@@ -14,8 +15,6 @@ mod render;
 mod systems;
 mod input;
 
-//Screen width
-//For naming purposes duplicate the constant
 const WINDOW_WIDTH: usize = 1920;
 const WINDOW_HEIGHT: u32 = 1080;
 
@@ -37,40 +36,28 @@ fn main() {
                 ..default()
             })
         )
-        //-------------------------SETUP--------------------------
         .add_systems(Startup, setup)
-        // .add_systems(Startup, setup_map)
-        //-------------------------RENDER--------------------------
         .add_plugins(RenderPlugin)
-        //---------------------------MAP--------------------------
         .add_plugins(MapPlugin)
-        //--------------------------INPUT--------------------------
         .add_plugins(OwnInputPlugin)
+        .add_plugins(FpsOverlayPlugin::default())
         .add_systems(Update, sync_camera_to_player)
-        //--------------------------RESOURCES--------------------------
         .insert_resource(ViewInfo::default())
         .insert_resource(PlayerCameraCache::default())
         .add_systems(Update, update_player_cache)
-        //--------------------------TEST--------------------------
-        // .add_systems(Startup, test_wall_render)
-        // .add_systems(Startup, mesh_setup)
         .run();
 }
 
-//Player marker
 #[derive(Component)]
-struct Player;
+pub struct Player;
 
-//Marker for the map window
 #[derive(Component)]
 struct MapWindowMarker;
 
-//--------------VIEW INFO---------------------
 #[derive(Resource)]
 pub struct ViewInfo {
     pub fov: f32,
     pub max_distance: f32,
-    //Distance which the screen sits from the players point of view
     pub view_distance: f32,
     pub eye_height: f32,
     pub pitch: f32,
@@ -79,7 +66,6 @@ pub struct ViewInfo {
 impl Default for ViewInfo {
     fn default() -> Self {
         let fov: f32 = 90.0;
-        //Calculate the distance from the camera to the screen
         let view_distance = (WINDOW_WIDTH as f32) / 2.0 / (fov.to_radians() / 2.0).tan();
         let eye_height = 1.8;
         let pitch = 0.0;
@@ -87,9 +73,8 @@ impl Default for ViewInfo {
     }
 }
 
-//-----------------CACHE FOR PLAYER INFO-----------------
 #[derive(Resource, Default)]
-struct PlayerCameraCache {
+pub struct PlayerCameraCache {
     pub transform: Transform,
 }
 
@@ -101,29 +86,25 @@ fn update_player_cache(
     player_cache.transform = *transform;
 }
 
-//-----------------------------SETUP FUNCTIONS--------------------------------
 fn setup(mut commands: Commands) {
     commands.spawn(Camera3d::default());
 
-    //Spawn Map Window
     let resolution: WindowResolution = (1920, 1080).into();
-    let window_size = Vec2::new(resolution.width(), resolution.height());
+    let _window_size = Vec2::new(resolution.width(), resolution.height());
 
     let map_win = commands
         .spawn((Window { resolution: resolution, resizable: false, ..default() }, MapWindowMarker))
         .id();
 
-    //Spawn Map Camera
     commands.spawn((
         Camera2d,
         RenderLayers::layer(1),
         RenderTarget::Window(WindowRef::Entity(map_win)),
     ));
-    //Spawn player
+
     commands.spawn((Player, Transform::from_xyz(50.0, 50.0, 0.0)));
 }
 
-//-----------------------------SYNC--------------------------------
 fn sync_camera_to_player(
     player_query: Query<&Transform, With<Player>>,
     mut camera_query: Query<&mut Transform, (With<Camera3d>, Without<Player>)>,
@@ -133,57 +114,13 @@ fn sync_camera_to_player(
         let pos = player.translation;
         let angle = player.rotation.to_euler(EulerRot::XYZ).2;
 
-        // Camera at player position + eye height
         camera.translation = Vec3::new(pos.x, pos.y, view_info.eye_height);
 
-        // Look in the direction of player rotation
-        // Player forward is (cos(angle), sin(angle)) in XY
-        // Camera should look at a point in that direction
         let look_target = Vec3::new(
-            pos.x + angle.cos(), // NO inversion
+            pos.x + angle.cos(),
             pos.y + angle.sin(),
-            view_info.eye_height
+            view_info.eye_height + view_info.pitch
         );
         camera.look_at(look_target, Vec3::Z);
     }
-}
-
-//-----------------------------TEST---------------------------------
-fn test_wall_render(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    asset_server: Res<AssetServer>
-) {
-    let texture: Handle<Image> = asset_server.load("texture.png");
-    let mesh = Mesh::new(bevy::mesh::PrimitiveTopology::TriangleList, RenderAssetUsages::default())
-        .with_inserted_attribute(
-            Mesh::ATTRIBUTE_POSITION,
-            vec![
-                [0.0, 0.0, 0.0], // bottom-left
-                [100.0, 0.0, 0.0], // bottom-right
-                [100.0, 0.0, 100.0], // top-right
-                [0.0, 0.0, 100.0] // top-left
-            ]
-        )
-        .with_inserted_attribute(
-            Mesh::ATTRIBUTE_NORMAL,
-            vec![[0.0, -1.0, 0.0], [0.0, -1.0, 0.0], [0.0, -1.0, 0.0], [0.0, -1.0, 0.0]]
-        )
-        .with_inserted_attribute(
-            Mesh::ATTRIBUTE_UV_0,
-            vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
-        )
-        .with_inserted_indices(Indices::U32(vec![0, 1, 2, 0, 2, 3]));
-
-    commands.spawn((
-        Mesh3d(meshes.add(mesh)),
-        MeshMaterial3d(
-            materials.add(StandardMaterial {
-                base_color_texture: Some(texture),
-                ..default()
-            })
-        ),
-        Transform::default(),
-    ));
 }

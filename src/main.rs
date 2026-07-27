@@ -1,10 +1,7 @@
 use bevy::{
-    asset::RenderAssetUsages,
-    camera::{ RenderTarget, visibility::RenderLayers },
-    mesh::Indices,
     prelude::*,
-    window::{ PresentMode, WindowRef, WindowResolution },
-    dev_tools::fps_overlay::{ FpsOverlayConfig, FpsOverlayPlugin, FrameTimeGraphConfig },
+    window::{ PresentMode, WindowResolution },
+    dev_tools::fps_overlay::FpsOverlayPlugin,
 };
 
 use crate::{ input::OwnInputPlugin, map::MapPlugin, render::RenderPlugin };
@@ -92,15 +89,15 @@ fn setup(mut commands: Commands) {
     let resolution: WindowResolution = (1920, 1080).into();
     let _window_size = Vec2::new(resolution.width(), resolution.height());
 
-    let map_win = commands
-        .spawn((Window { resolution: resolution, resizable: false, ..default() }, MapWindowMarker))
-        .id();
+    // let map_win = commands
+    //     .spawn((Window { resolution: resolution, resizable: false, ..default() }, MapWindowMarker))
+    //     .id();
 
-    commands.spawn((
-        Camera2d,
-        RenderLayers::layer(1),
-        RenderTarget::Window(WindowRef::Entity(map_win)),
-    ));
+    // commands.spawn((
+    //     Camera2d,
+    //     RenderLayers::layer(1),
+    //     RenderTarget::Window(WindowRef::Entity(map_win)),
+    // ));
 
     commands.spawn((Player, Transform::from_xyz(50.0, 50.0, 0.0)));
 }

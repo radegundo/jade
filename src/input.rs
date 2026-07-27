@@ -4,6 +4,9 @@ use bevy::window::{ CursorGrabMode, CursorOptions, PrimaryWindow };
 
 use crate::{ Player, ViewInfo };
 
+const YAW_SENSITIVITY: f32 = 0.002;
+const PITCH_SENSITIVITY: f32 = 0.002;
+
 pub struct OwnInputPlugin;
 
 impl Plugin for OwnInputPlugin {
@@ -29,7 +32,7 @@ pub fn input(
         let forward = Vec2::new(angle.cos(), angle.sin());
         let right = Vec2::new(-forward.y, forward.x);
 
-        let speed = 200.0;
+        let speed = 100.0;
         let mut movement = Vec2::ZERO;
 
         if keyboard_input.pressed(KeyCode::KeyW) {
@@ -64,10 +67,10 @@ fn mouse_look(
     }
 
     if let Ok(mut transform) = player_query.single_mut() {
-        let yaw = -delta.x * 0.003;
+        let yaw = -delta.x * YAW_SENSITIVITY;
         transform.rotate_z(yaw);
     }
 
-    view_info.pitch += -delta.y * 0.003;
+    view_info.pitch += -delta.y * PITCH_SENSITIVITY;
     view_info.pitch = view_info.pitch.clamp(-2.0, 2.0);
 }

@@ -1,5 +1,7 @@
 use std::cmp::min;
 
+use bevy::asset::RenderAssetUsages;
+use bevy::mesh::Indices;
 use bevy::platform::collections::{ HashMap, HashSet };
 use bevy::{ mesh::PrimitiveTopology, prelude::* };
 use crate::ray::*;
@@ -12,7 +14,6 @@ pub struct RenderPlugin;
 impl Plugin for RenderPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, render)
-            .add_systems(Update, render_2d)
             .add_systems(PostStartup, spawn_obstacle_entities)
             .insert_resource(WallEntityPool::default())
             .insert_resource(PortalBoundaryEntityPool::default())
@@ -138,7 +139,8 @@ fn spawn_obstacle_entities(
 
 //------------------MAIN RENDER FUNCTIONS------------------------
 
-pub fn render_2d(
+//LEGACY 2D RENDER
+pub fn _render_2d(
     mut gizmos: Gizmos<MapGizmos>,
     map: Res<Map>,
     view_info: Res<ViewInfo>,
@@ -150,12 +152,12 @@ pub fn render_2d(
             let sector = &map.sectors[sector_idx];
             if let Some(hit) = get_hit_sector(&transform, &view_info, sector.id, &map, i) {
                 let x = hit_to_screen_x(&view_info, i);
-                let window_top = project_height(
+                let window_top = _project_height(
                     sector.ceiling_height - EYE_OFFSET,
                     hit.perp_dist,
                     &view_info
                 );
-                let window_bottom = project_height(
+                let window_bottom = _project_height(
                     sector.floor_height - EYE_OFFSET,
                     hit.perp_dist,
                     &view_info
@@ -774,7 +776,8 @@ impl Default for VissEntityPool {
 
 //------------------MESH BUILDERS------------------------------
 
-fn project_height(world_height: f32, dist: f32, view_info: &ViewInfo) -> f32 {
+//LEGACY HEIGHT PROJECTION
+fn _project_height(world_height: f32, dist: f32, view_info: &ViewInfo) -> f32 {
     let relative = world_height - view_info.eye_height;
     (relative * view_info.view_distance) / dist + view_info.pitch
 }

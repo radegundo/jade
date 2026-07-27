@@ -10,8 +10,8 @@ impl Plugin for MapPlugin {
         app.add_systems(Startup, setup_gizmo_layers)
             .add_systems(Startup, setup_map)
             .add_systems(Update, update_eye_height)
-            .init_gizmo_group::<MapGizmos>()
-            .add_plugins(RelativeMapPlugin);
+            .init_gizmo_group::<MapGizmos>();
+        // .add_plugins(RelativeMapPlugin);
     }
 }
 

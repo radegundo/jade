@@ -18,12 +18,24 @@ pub fn draw_walls(
     mut gizmos: Gizmos<MapGizmos>,
     player_cache: Res<PlayerCameraCache>
 ) {
+    let transform = &player_cache.transform;
     for sector in &map.sectors {
         for wall in &sector.walls {
-            let transform = &player_cache.transform;
-            let start: Vec2 = get_relative_coords(transform, wall.start);
-            let end: Vec2 = get_relative_coords(transform, wall.end);
-            gizmos.line(start.extend(0.0), end.extend(0.0), Color::WHITE);
+            let start = get_relative_coords(transform, wall.start);
+            let end = get_relative_coords(transform, wall.end);
+            let color = if wall.back_side_def.is_some() {
+                Color::srgb(0.35, 0.35, 0.35)
+            } else {
+                Color::WHITE
+            };
+            gizmos.line_2d(start, end, color);
+        }
+        for obstacle in &sector.obstacles {
+            for edge in &obstacle.edges {
+                let start = get_relative_coords(transform, edge.start);
+                let end = get_relative_coords(transform, edge.end);
+                gizmos.line_2d(start, end, Color::srgb(0.7, 0.5, 0.2));
+            }
         }
     }
 }
@@ -45,5 +57,6 @@ pub fn draw_rays(
 }
 
 fn draw_player(mut gizmos: Gizmos<MapGizmos>) {
-    gizmos.circle_2d(Isometry2d::default(), 5.0, Color::srgb(1.0, 1.0, 1.0));
+    gizmos.circle_2d(Isometry2d::default(), 5.0, Color::srgb(0.0, 1.0, 0.0));
+    gizmos.line_2d(Vec2::ZERO, Vec2::new(0.0, 8.0), Color::srgb(0.0, 1.0, 0.0));
 }

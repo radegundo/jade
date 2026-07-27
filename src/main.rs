@@ -1,7 +1,7 @@
 use bevy::{
+    camera::{ Viewport, visibility::RenderLayers },
     prelude::*,
     window::{ PresentMode, WindowResolution },
-    dev_tools::fps_overlay::FpsOverlayPlugin,
 };
 
 use crate::{ input::OwnInputPlugin, map::MapPlugin, render::RenderPlugin };
@@ -37,11 +37,13 @@ fn main() {
         .add_plugins(RenderPlugin)
         .add_plugins(MapPlugin)
         .add_plugins(OwnInputPlugin)
-        .add_plugins(FpsOverlayPlugin::default())
-        .add_systems(Update, sync_camera_to_player)
         .insert_resource(ViewInfo::default())
         .insert_resource(PlayerCameraCache::default())
+        .insert_resource(FpsState::default())
+        .add_systems(Update, sync_camera_to_player)
         .add_systems(Update, update_player_cache)
+        .add_systems(Update, update_fps)
+        .add_systems(Update, toggle_fps_visible)
         .run();
 }
 
@@ -49,7 +51,21 @@ fn main() {
 pub struct Player;
 
 #[derive(Component)]
-struct MapWindowMarker;
+struct FpsCounterMarker;
+
+#[derive(Resource)]
+pub struct FpsState {
+    pub visible: bool,
+    frame_count: u32,
+    elapsed: f32,
+    display_value: f32,
+}
+
+impl Default for FpsState {
+    fn default() -> Self {
+        Self { visible: true, frame_count: 0, elapsed: 0.0, display_value: 0.0 }
+    }
+}
 
 #[derive(Resource)]
 pub struct ViewInfo {
@@ -86,18 +102,34 @@ fn update_player_cache(
 fn setup(mut commands: Commands) {
     commands.spawn(Camera3d::default());
 
-    let resolution: WindowResolution = (1920, 1080).into();
-    let _window_size = Vec2::new(resolution.width(), resolution.height());
+    let minimap_size = UVec2::new(250, 250);
+    let margin = 20;
+    commands.spawn((
+        Camera2d,
+        Camera {
+            order: 1,
+            viewport: Some(Viewport {
+                physical_position: UVec2::new(1920 - minimap_size.x - margin, margin),
+                physical_size: minimap_size,
+                ..default()
+            }),
+            ..default()
+        },
+        RenderLayers::layer(1),
+    ));
 
-    // let map_win = commands
-    //     .spawn((Window { resolution: resolution, resizable: false, ..default() }, MapWindowMarker))
-    //     .id();
-
-    // commands.spawn((
-    //     Camera2d,
-    //     RenderLayers::layer(1),
-    //     RenderTarget::Window(WindowRef::Entity(map_win)),
-    // ));
+    commands.spawn((
+        Text::new("FPS: --"),
+        TextFont::from_font_size(18.0),
+        TextColor(Color::srgb(0.3, 1.0, 0.3)),
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(10.0),
+            left: Val::Px(10.0),
+            ..default()
+        },
+        FpsCounterMarker,
+    ));
 
     commands.spawn((Player, Transform::from_xyz(50.0, 50.0, 0.0)));
 }
@@ -119,5 +151,35 @@ fn sync_camera_to_player(
             view_info.eye_height + view_info.pitch
         );
         camera.look_at(look_target, Vec3::Z);
+    }
+}
+
+fn update_fps(
+    time: Res<Time>,
+    mut state: ResMut<FpsState>,
+    mut query: Query<&mut Text, With<FpsCounterMarker>>,
+) {
+    state.frame_count += 1;
+    state.elapsed += time.delta_secs();
+    if state.elapsed >= 0.4 {
+        state.display_value = state.frame_count as f32 / state.elapsed;
+        state.frame_count = 0;
+        state.elapsed = 0.0;
+        if let Ok(mut text) = query.single_mut() {
+            text.0 = format!("FPS: {:.1}", state.display_value);
+        }
+    }
+}
+
+fn toggle_fps_visible(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut state: ResMut<FpsState>,
+    mut query: Query<&mut Visibility, With<FpsCounterMarker>>,
+) {
+    if keyboard.just_pressed(KeyCode::F1) {
+        state.visible = !state.visible;
+        if let Ok(mut vis) = query.single_mut() {
+            *vis = if state.visible { Visibility::Visible } else { Visibility::Hidden };
+        }
     }
 }

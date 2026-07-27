@@ -1,7 +1,13 @@
 use bevy::{ camera::visibility::RenderLayers, prelude::* };
-use crate::{ EYE_OFFSET, PlayerCameraCache, ViewInfo, map::relative_map::RelativeMapPlugin };
+use crate::{
+    EYE_OFFSET,
+    PlayerCameraCache,
+    ViewInfo,
+    map::{ relative_map::RelativeMapPlugin, test_maps::doom_e1m1 },
+};
 
 pub mod relative_map;
+pub mod test_maps;
 
 //------------------------------MAP PLUGIN-------------------------
 pub struct MapPlugin;
@@ -10,8 +16,8 @@ impl Plugin for MapPlugin {
         app.add_systems(Startup, setup_gizmo_layers)
             .add_systems(Startup, setup_map)
             .add_systems(Update, update_eye_height)
-            .init_gizmo_group::<MapGizmos>();
-        // .add_plugins(RelativeMapPlugin);
+            .init_gizmo_group::<MapGizmos>()
+            .add_plugins(RelativeMapPlugin);
     }
 }
 
@@ -91,7 +97,7 @@ fn setup_gizmo_layers(mut config_store: ResMut<GizmoConfigStore>) {
 //-----------------------------MAP SETUP--------------------------------
 
 fn setup_map(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.insert_resource(test_map(asset_server));
+    commands.insert_resource(doom_e1m1(&asset_server));
 }
 
 //------------HELPER FUNCTIONS FOR SECTOR BUILDING----------------

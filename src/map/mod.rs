@@ -33,20 +33,17 @@ pub struct Sector {
     pub id: usize,
 }
 
-/// An obstacle is a 2D polygon with a vertical extent that lives inside
-/// a sector. It does not form sector boundaries — it floats within the space.
 #[derive(Clone)]
 pub struct Obstacle {
     pub id: usize,
     pub edges: Vec<LineDef>,
     pub bottom: f32,
     pub top: f32,
-    pub texture: Handle<Image>,
+    pub side_texture: Handle<Image>,
+    pub top_texture: Handle<Image>,
+    pub bottom_texture: Handle<Image>,
 }
 
-/// Uniquely identifies a wall within the map.
-/// sector: which sector owns this wall
-/// index: position in sector.walls (or obstacle.edges for obstacles)
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct WallId {
     pub sector: usize,
@@ -71,17 +68,13 @@ pub struct LineDef {
 #[derive(Clone)]
 pub struct SideDef {
     pub textures: SideDefTextures,
-    /// Which sector this side faces toward
     pub facing: usize,
 }
 
 #[derive(Clone)]
 pub struct SideDefTextures {
-    /// Rendered above a portal opening (front ceiling higher than back ceiling)
     pub upper: Option<Handle<Image>>,
-    /// Rendered on solid walls
     pub middle: Option<Handle<Image>>,
-    /// Rendered below a portal opening (back floor higher than front floor)
     pub lower: Option<Handle<Image>>,
 }
 
@@ -103,6 +96,7 @@ fn setup_map(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 //------------HELPER FUNCTIONS FOR SECTOR BUILDING----------------
 
+#[allow(dead_code)]
 pub fn rect_sector(
     id: usize,
     x0: f32,
@@ -187,11 +181,21 @@ pub struct ObstacleBuilder {
     id: usize,
     sector_id: usize,
     wall_counter: usize,
-    texture: Handle<Image>,
+    side_texture: Handle<Image>,
+    top_texture: Handle<Image>,
+    bottom_texture: Handle<Image>,
 }
 
 impl ObstacleBuilder {
-    pub fn new(id: usize, sector_id: usize, bottom: f32, top: f32, texture: Handle<Image>) -> Self {
+    pub fn new(
+        id: usize,
+        sector_id: usize,
+        bottom: f32,
+        top: f32,
+        side_texture: Handle<Image>,
+        top_texture: Handle<Image>,
+        bottom_texture: Handle<Image>
+    ) -> Self {
         Self {
             edges: Vec::new(),
             bottom,
@@ -199,15 +203,15 @@ impl ObstacleBuilder {
             id,
             sector_id,
             wall_counter: 0,
-            texture,
+            side_texture,
+            top_texture,
+            bottom_texture,
         }
     }
 
     pub fn edge(mut self, x0: f32, y0: f32, x1: f32, y1: f32) -> Self {
-        // Obstacle edges use a WallId index offset of 1000+
-        // to avoid colliding with sector wall indices (0, 1, 2...)
         let wall_id = WallId::new(self.sector_id, 1000 + self.id * 100 + self.wall_counter);
-        let edge = wall(x0, y0, x1, y1, self.texture.clone(), wall_id);
+        let edge = wall(x0, y0, x1, y1, self.side_texture.clone(), wall_id);
         self.edges.push(edge);
         self.wall_counter += 1;
         self
@@ -219,16 +223,18 @@ impl ObstacleBuilder {
             edges: self.edges,
             bottom: self.bottom,
             top: self.top,
-            texture: self.texture,
+            side_texture: self.side_texture,
+            top_texture: self.top_texture,
+            bottom_texture: self.bottom_texture,
         }
     }
 }
 
 /// Builds a rectangular box obstacle.
-/// Edges are wound CLOCKWISE so normals face OUTWARD.
-/// Sector walls are wound CCW (inward normals) because the player
-/// is inside them. Obstacle edges are wound CW (outward normals)
-/// because the player is outside them.
+/// Edges wound CLOCKWISE so normals face OUTWARD.
+/// side_texture: the four vertical faces
+/// top_texture:  the top horizontal cap
+/// bottom_texture: the bottom horizontal cap
 pub fn rect_obstacle(
     id: usize,
     sector_id: usize,
@@ -238,13 +244,15 @@ pub fn rect_obstacle(
     y1: f32,
     bottom: f32,
     top: f32,
-    texture: Handle<Image>
+    side_texture: Handle<Image>,
+    top_texture: Handle<Image>,
+    bottom_texture: Handle<Image>
 ) -> Obstacle {
-    ObstacleBuilder::new(id, sector_id, bottom, top, texture)
-        .edge(x1, y0, x0, y0) // bottom (reversed)
-        .edge(x0, y0, x0, y1) // left   (reversed)
-        .edge(x0, y1, x1, y1) // top    (reversed)
-        .edge(x1, y1, x1, y0) // right  (reversed)
+    ObstacleBuilder::new(id, sector_id, bottom, top, side_texture, top_texture, bottom_texture)
+        .edge(x1, y0, x0, y0) // bottom face (reversed)
+        .edge(x0, y0, x0, y1) // left face   (reversed)
+        .edge(x0, y1, x1, y1) // top face    (reversed)
+        .edge(x1, y1, x1, y0) // right face  (reversed)
         .build()
 }
 
@@ -327,6 +335,8 @@ impl SectorBuilder {
         self
     }
 
+    /// Convenience builder for a rectangular box obstacle with separate
+    /// textures for sides, top cap, and bottom cap.
     pub fn rect_obstacle(
         self,
         id: usize,
@@ -336,9 +346,23 @@ impl SectorBuilder {
         y1: f32,
         bottom: f32,
         top: f32,
-        texture: Handle<Image>
+        side_texture: Handle<Image>,
+        top_texture: Handle<Image>,
+        bottom_texture: Handle<Image>
     ) -> Self {
-        let obs = rect_obstacle(id, self.id, x0, y0, x1, y1, bottom, top, texture);
+        let obs = rect_obstacle(
+            id,
+            self.id,
+            x0,
+            y0,
+            x1,
+            y1,
+            bottom,
+            top,
+            side_texture,
+            top_texture,
+            bottom_texture
+        );
         self.obstacle(obs)
     }
 
@@ -357,9 +381,6 @@ impl SectorBuilder {
 
 //---------------SYSTEMS----------------------
 
-/// Point-in-polygon test using ray casting.
-/// Counts how many sector walls a horizontal ray from point crosses.
-/// Odd count = inside, even = outside.
 pub fn point_in_sector(point: Vec2, sector: &Sector) -> bool {
     let mut inside = false;
     for wall in &sector.walls {
@@ -385,9 +406,6 @@ pub fn find_player_sector(player_pos: Vec2, map: &Map) -> Option<usize> {
     None
 }
 
-/// Smoothly moves view_info.eye_height toward the current sector's floor
-/// plus EYE_OFFSET. This makes stepping between different-height sectors
-/// feel smooth instead of snapping.
 pub fn update_eye_height(
     player_cache: Res<PlayerCameraCache>,
     map: Res<Map>,
@@ -411,10 +429,11 @@ pub fn test_map(asset_server: Res<AssetServer>) -> Map {
     let wall_tex: Handle<Image> = asset_server.load("texture.png");
     let floor_tex: Handle<Image> = asset_server.load("floor_texture.png");
     let ceil_tex: Handle<Image> = asset_server.load("floor_texture.png");
+    let obstacle_top_tex: Handle<Image> = asset_server.load("floor_texture.png");
+    let obstacle_bottom_tex: Handle<Image> = asset_server.load("floor_texture.png");
 
     Map {
         sectors: vec![
-            // Sector 0: Main room — 100x100, floor at 0, ceiling at 20
             SectorBuilder::new(0, 0.0, 20.0, floor_tex.clone(), ceil_tex.clone())
                 .wall(0.0, 0.0, 100.0, 0.0, 0, wall_tex.clone())
                 .wall(100.0, 0.0, 100.0, 40.0, 1, wall_tex.clone())
@@ -422,13 +441,34 @@ pub fn test_map(asset_server: Res<AssetServer>) -> Map {
                 .wall(100.0, 60.0, 100.0, 100.0, 3, wall_tex.clone())
                 .wall(100.0, 100.0, 0.0, 100.0, 4, wall_tex.clone())
                 .wall(0.0, 100.0, 0.0, 0.0, 5, wall_tex.clone())
-                // Box sitting on the floor (0 → 8)
-                .rect_obstacle(0, 40.0, 40.0, 50.0, 50.0, 0.0, 8.0, wall_tex.clone())
-                // Floating platform (5 → 7)
-                .rect_obstacle(1, 60.0, 70.0, 80.0, 90.0, 5.0, 7.0, wall_tex.clone())
+                // Box sitting on the floor — sides, top cap, bottom cap
+                .rect_obstacle(
+                    0,
+                    40.0,
+                    40.0,
+                    50.0,
+                    50.0,
+                    0.0,
+                    8.0,
+                    wall_tex.clone(),
+                    obstacle_top_tex.clone(),
+                    obstacle_bottom_tex.clone()
+                )
+                // Floating platform — sides, top cap, bottom cap
+                .rect_obstacle(
+                    1,
+                    60.0,
+                    70.0,
+                    80.0,
+                    90.0,
+                    5.0,
+                    7.0,
+                    wall_tex.clone(),
+                    obstacle_top_tex.clone(),
+                    obstacle_bottom_tex.clone()
+                )
                 .build(),
 
-            // Sector 1: Corridor — raised floor (10), portal back to sector 0
             SectorBuilder::new(1, 10.0, 20.0, floor_tex.clone(), ceil_tex.clone())
                 .wall(100.0, 40.0, 140.0, 40.0, 0, wall_tex.clone())
                 .wall(140.0, 40.0, 140.0, 60.0, 1, wall_tex.clone())

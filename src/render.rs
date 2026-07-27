@@ -23,25 +23,35 @@ impl Plugin for RenderPlugin {
 
 //------------------OBSTACLE STARTUP SPAWNING--------------------
 
-/// Uniquely identifies one edge of one obstacle in one sector.
+/// Identifies one renderable surface of an obstacle.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct ObstacleEdgeKey {
-    sector_id: usize,
-    obstacle_id: usize,
-    edge_index: usize,
+pub(crate) enum ObstacleSurface {
+    /// One of the vertical side edges, identified by index in obstacle.edges
+    Side(usize),
+    /// The horizontal top cap
+    Top,
+    /// The horizontal bottom cap
+    Bottom,
 }
 
-/// Resource that holds the pre-spawned entity for every obstacle edge.
-/// Built once at PostStartup, never modified.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct ObstacleEdgeKey {
+    pub(crate) sector_id: usize,
+    pub(crate) obstacle_id: usize,
+    pub(crate) surface: ObstacleSurface,
+}
+
+// Resource that holds the pre-spawned entity for every obstacle edge.
+// Built once at PostStartup, never modified.
 #[derive(Resource, Default)]
 pub(crate) struct ObstacleEntities {
     pub(crate) edges: HashMap<ObstacleEdgeKey, Entity>,
 }
 
-/// Runs once after startup.
-/// For every obstacle edge in the map, builds the full mesh and spawns
-/// a Hidden entity. Each entity is stored by ObstacleEdgeKey.
-/// The render system only toggles Visibility — no mesh work at runtime.
+// Runs once after startup.
+// For every obstacle edge in the map, builds the full mesh and spawns
+// a Hidden entity. Each entity is stored by ObstacleEdgeKey.
+// The render system only toggles Visibility — no mesh work at runtime.
 fn spawn_obstacle_entities(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -51,13 +61,13 @@ fn spawn_obstacle_entities(
 ) {
     for sector in &map.sectors {
         for obstacle in &sector.obstacles {
+            // --- SIDE EDGES (one entity per edge, exactly as before) ---
             for (edge_index, edge) in obstacle.edges.iter().enumerate() {
                 let mesh = build_obstacle_edge_mesh(edge, obstacle.bottom, obstacle.top);
                 let material = StandardMaterial {
-                    base_color_texture: Some(obstacle.texture.clone()),
+                    base_color_texture: Some(obstacle.side_texture.clone()),
                     ..default()
                 };
-
                 let entity = commands
                     .spawn((
                         Visibility::Hidden,
@@ -68,10 +78,60 @@ fn spawn_obstacle_entities(
                     .id();
 
                 obstacle_entities.edges.insert(
-                    ObstacleEdgeKey { sector_id: sector.id, obstacle_id: obstacle.id, edge_index },
+                    ObstacleEdgeKey {
+                        sector_id: sector.id,
+                        obstacle_id: obstacle.id,
+                        surface: ObstacleSurface::Side(edge_index),
+                    },
                     entity
                 );
             }
+
+            // --- TOP CAP ---
+            let top_mesh = build_obstacle_cap_mesh(&obstacle.edges, obstacle.top, true);
+            let top_material = StandardMaterial {
+                base_color_texture: Some(obstacle.top_texture.clone()),
+                ..default()
+            };
+            let top_entity = commands
+                .spawn((
+                    Visibility::Hidden,
+                    Mesh3d(meshes.add(top_mesh)),
+                    MeshMaterial3d(materials.add(top_material)),
+                    Transform::default(),
+                ))
+                .id();
+            obstacle_entities.edges.insert(
+                ObstacleEdgeKey {
+                    sector_id: sector.id,
+                    obstacle_id: obstacle.id,
+                    surface: ObstacleSurface::Top,
+                },
+                top_entity
+            );
+
+            // --- BOTTOM CAP ---
+            let bottom_mesh = build_obstacle_cap_mesh(&obstacle.edges, obstacle.bottom, false);
+            let bottom_material = StandardMaterial {
+                base_color_texture: Some(obstacle.bottom_texture.clone()),
+                ..default()
+            };
+            let bottom_entity = commands
+                .spawn((
+                    Visibility::Hidden,
+                    Mesh3d(meshes.add(bottom_mesh)),
+                    MeshMaterial3d(materials.add(bottom_material)),
+                    Transform::default(),
+                ))
+                .id();
+            obstacle_entities.edges.insert(
+                ObstacleEdgeKey {
+                    sector_id: sector.id,
+                    obstacle_id: obstacle.id,
+                    surface: ObstacleSurface::Bottom,
+                },
+                bottom_entity
+            );
         }
     }
 }
@@ -244,17 +304,34 @@ fn recurse_sector(
                         obstacle.id
                     )
                 {
-                    // Mark every visible edge of this obstacle
                     let end = origin + Vec2::new(angle.cos(), angle.sin()) * view_info.max_distance;
                     let ray = make_ray(origin, end);
+
+                    let mut any_side_visible = false;
+
                     for (edge_index, edge) in obstacle.edges.iter().enumerate() {
                         if test_ray_hit(&ray, edge, origin, max_dist_sq) {
                             visible_obstacles.insert(ObstacleEdgeKey {
                                 sector_id: sector_index,
                                 obstacle_id: obstacle.id,
-                                edge_index,
+                                surface: ObstacleSurface::Side(edge_index),
                             });
+                            any_side_visible = true;
                         }
+                    }
+
+                    // Top and bottom caps are visible whenever any side is visible
+                    if any_side_visible {
+                        visible_obstacles.insert(ObstacleEdgeKey {
+                            sector_id: sector_index,
+                            obstacle_id: obstacle.id,
+                            surface: ObstacleSurface::Top,
+                        });
+                        visible_obstacles.insert(ObstacleEdgeKey {
+                            sector_id: sector_index,
+                            obstacle_id: obstacle.id,
+                            surface: ObstacleSurface::Bottom,
+                        });
                     }
                 }
             }
@@ -658,7 +735,7 @@ fn render_viss_groups(
 
 #[derive(Resource)]
 pub struct WallEntityPool {
-    /// (entity, mesh_handle) — mesh_handle lets us overwrite in place
+    // (entity, mesh_handle) — mesh_handle lets us overwrite in place
     pub entities: Vec<(Entity, Handle<Mesh>)>,
     pub used: usize,
 }
@@ -671,7 +748,7 @@ impl Default for WallEntityPool {
 
 #[derive(Resource)]
 pub struct PortalBoundaryEntityPool {
-    /// (upper_entity, upper_mesh, lower_entity, lower_mesh)
+    // (upper_entity, upper_mesh, lower_entity, lower_mesh)
     pub entities: Vec<(Entity, Handle<Mesh>, Entity, Handle<Mesh>)>,
     pub used: usize,
 }
@@ -684,7 +761,7 @@ impl Default for PortalBoundaryEntityPool {
 
 #[derive(Resource)]
 pub struct VissEntityPool {
-    /// (ceil_entity, ceil_mesh, floor_entity, floor_mesh)
+    // (ceil_entity, ceil_mesh, floor_entity, floor_mesh)
     pub entities: Vec<(Entity, Handle<Mesh>, Entity, Handle<Mesh>)>,
     pub used: usize,
 }
@@ -702,9 +779,9 @@ fn project_height(world_height: f32, dist: f32, view_info: &ViewInfo) -> f32 {
     (relative * view_info.view_distance) / dist + view_info.pitch
 }
 
-/// Wall mesh is built from ray hit positions (partial wall slice).
-/// bottom/top come from the hit itself so the same function works
-/// for walls at any height.
+// Wall mesh is built from ray hit positions (partial wall slice).
+// bottom/top come from the hit itself so the same function works
+// for walls at any height.
 pub fn build_wall_mesh(hit_group: &[WallHit], wall: &LineDef) -> Mesh {
     let start = hit_group.first().unwrap();
     let end = hit_group.last().unwrap();
@@ -734,9 +811,9 @@ pub fn build_wall_mesh(hit_group: &[WallHit], wall: &LineDef) -> Mesh {
         .with_inserted_indices(Indices::U32(vec![0, 2, 1, 0, 3, 2]))
 }
 
-/// Portal boundary mesh fills the height gap between two sectors.
-/// floor_height/ceiling_height are passed explicitly because the
-/// boundary height range doesn't come from either sector alone.
+// Portal boundary mesh fills the height gap between two sectors.
+// floor_height/ceiling_height are passed explicitly because the
+// boundary height range doesn't come from either sector alone.
 pub fn build_portal_boundary_mesh(
     hit_group: &[WallHit],
     wall: &LineDef,
@@ -771,9 +848,9 @@ pub fn build_portal_boundary_mesh(
         .with_inserted_indices(Indices::U32(vec![0, 2, 1, 0, 3, 2]))
 }
 
-/// Obstacle mesh is built from the full LineDef geometry (not ray hits).
-/// Built once at startup and never rebuilt.
-/// UVs span 0..1 across the full edge length.
+// Obstacle mesh is built from the full LineDef geometry (not ray hits).
+// Built once at startup and never rebuilt.
+// UVs span 0..1 across the full edge length.
 pub fn build_obstacle_edge_mesh(edge: &LineDef, bottom: f32, top: f32) -> Mesh {
     let p0 = edge.start;
     let p1 = edge.end;
@@ -796,8 +873,8 @@ pub fn build_obstacle_edge_mesh(edge: &LineDef, bottom: f32, top: f32) -> Mesh {
         .with_inserted_indices(Indices::U32(vec![0, 2, 1, 0, 3, 2]))
 }
 
-/// Viss mesh triangulates the sector polygon at a given height.
-/// facing_up controls normal direction and triangle winding.
+// Viss mesh triangulates the sector polygon at a given height.
+// facing_up controls normal direction and triangle winding.
 pub fn build_viss_mesh(sector: &Sector, height: f32, facing_up: bool) -> Mesh {
     let vertices: Vec<Vec2> = sector.walls
         .iter()
@@ -844,6 +921,70 @@ pub fn build_viss_mesh(sector: &Sector, height: f32, facing_up: bool) -> Mesh {
         })
         .collect();
 
+    let indices = triangulate_polygon(&vertices, facing_up);
+
+    Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+        .with_inserted_indices(Indices::U32(indices))
+}
+
+/// Builds a horizontal cap mesh (top or bottom face) for an obstacle.
+/// Uses the obstacle edge start points to form the polygon outline,
+/// then triangulates it exactly like a viss plane.
+/// facing_up: true = top cap (normal +Z), false = bottom cap (normal -Z)
+pub fn build_obstacle_cap_mesh(edges: &[LineDef], height: f32, facing_up: bool) -> Mesh {
+    // Collect polygon vertices from edge start points
+    let vertices: Vec<Vec2> = edges
+        .iter()
+        .map(|e| e.start)
+        .collect();
+
+    let vertex_count = vertices.len();
+    if vertex_count < 3 {
+        return Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
+    }
+
+    let positions: Vec<[f32; 3]> = vertices
+        .iter()
+        .map(|v| [v.x, v.y, height])
+        .collect();
+
+    let normal = if facing_up { [0.0, 0.0, 1.0] } else { [0.0, 0.0, -1.0] };
+    let normals: Vec<[f32; 3]> = vec![normal; vertex_count];
+
+    // Normalize UVs to the bounding box of the obstacle footprint
+    let min_x = vertices
+        .iter()
+        .map(|v| v.x)
+        .fold(f32::INFINITY, f32::min);
+    let max_x = vertices
+        .iter()
+        .map(|v| v.x)
+        .fold(f32::NEG_INFINITY, f32::max);
+    let min_y = vertices
+        .iter()
+        .map(|v| v.y)
+        .fold(f32::INFINITY, f32::min);
+    let max_y = vertices
+        .iter()
+        .map(|v| v.y)
+        .fold(f32::NEG_INFINITY, f32::max);
+    let range_x = max_x - min_x;
+    let range_y = max_y - min_y;
+
+    let uvs: Vec<[f32; 2]> = vertices
+        .iter()
+        .map(|v| {
+            let u = if range_x > 0.0 { (v.x - min_x) / range_x } else { 0.0 };
+            let vc = if range_y > 0.0 { (v.y - min_y) / range_y } else { 0.0 };
+            [u, vc]
+        })
+        .collect();
+
+    // Obstacle edges are CW, so the polygon winding is CW.
+    // Pass facing_up so triangulate_polygon emits correct winding for each face.
     let indices = triangulate_polygon(&vertices, facing_up);
 
     Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())

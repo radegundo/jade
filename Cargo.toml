@@ -5,4 +5,3 @@ edition = "2024"
 
 [dependencies]
 bevy = { version = "0.19", features = ["dynamic_linking", "debug", "bevy_dev_tools"] }
-bevy_grid = {path = "../bevy-grid"}

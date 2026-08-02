@@ -64,7 +64,7 @@ fn spawn_obstacle_entities(
         for obstacle in &sector.obstacles {
             // --- SIDE EDGES (one entity per edge, exactly as before) ---
             for (edge_index, edge) in obstacle.edges.iter().enumerate() {
-                let mesh = build_obstacle_edge_mesh(edge, obstacle.bottom, obstacle.top);
+                let mesh = build_obstacle_edge_mesh(edge, obstacle.bottom, obstacle.top, &map.vertices);
                 let material = StandardMaterial {
                     base_color_texture: Some(obstacle.side_texture.clone()),
                     ..default()
@@ -89,7 +89,7 @@ fn spawn_obstacle_entities(
             }
 
             // --- TOP CAP ---
-            let top_mesh = build_obstacle_cap_mesh(&obstacle.edges, obstacle.top, true);
+            let top_mesh = build_obstacle_cap_mesh(&obstacle.edges, obstacle.top, true, &map.vertices);
             let top_material = StandardMaterial {
                 base_color_texture: Some(obstacle.top_texture.clone()),
                 ..default()
@@ -112,7 +112,7 @@ fn spawn_obstacle_entities(
             );
 
             // --- BOTTOM CAP ---
-            let bottom_mesh = build_obstacle_cap_mesh(&obstacle.edges, obstacle.bottom, false);
+            let bottom_mesh = build_obstacle_cap_mesh(&obstacle.edges, obstacle.bottom, false, &map.vertices);
             let bottom_material = StandardMaterial {
                 base_color_texture: Some(obstacle.bottom_texture.clone()),
                 ..default()
@@ -182,6 +182,7 @@ pub fn render(
     mut query: Query<&mut Visibility>
 ) {
     let transform = &player_cache.transform;
+    let vertices = &map.vertices;
 
     if let Some(player_sector_index) = find_player_sector(transform.translation.truncate(), &map) {
         let mut all_groups: Vec<WallGroup> = Vec::new();
@@ -200,6 +201,7 @@ pub fn render(
             &view_info,
             player_sector_index,
             &map,
+            vertices,
             &initial_origins,
             &mut visited_per_ray,
             &mut all_groups,
@@ -219,7 +221,8 @@ pub fn render(
             &mut materials,
             &mut wall_pool,
             &mut query,
-            &all_groups
+            &all_groups,
+            vertices
         );
         render_portal_boundary_groups(
             &mut commands,
@@ -227,7 +230,8 @@ pub fn render(
             &mut materials,
             &mut portal_pool,
             &mut query,
-            &portal_boundary_groups
+            &portal_boundary_groups,
+            vertices
         );
         render_viss_groups(
             &mut commands,
@@ -235,7 +239,8 @@ pub fn render(
             &mut materials,
             &mut viss_pool,
             &mut query,
-            &viss_groups
+            &viss_groups,
+            vertices
         );
 
         // Toggle obstacle visibility — no mesh work, just Visible/Hidden
@@ -258,6 +263,7 @@ fn recurse_sector(
     view_info: &ViewInfo,
     sector_index: usize,
     map: &Map,
+    vertices: &[Vec2],
     ray_origins: &[(usize, Vec2)],
     visited_per_ray: &mut HashMap<usize, HashSet<usize>>,
     all_groups: &mut Vec<WallGroup>,
@@ -312,7 +318,7 @@ fn recurse_sector(
                     let mut any_side_visible = false;
 
                     for (edge_index, edge) in obstacle.edges.iter().enumerate() {
-                        if test_ray_hit(&ray, edge, origin, max_dist_sq) {
+                        if test_ray_hit(&ray, edge, origin, max_dist_sq, vertices) {
                             visible_obstacles.insert(ObstacleEdgeKey {
                                 sector_id: sector_index,
                                 obstacle_id: obstacle.id,
@@ -393,6 +399,7 @@ fn recurse_sector(
             view_info,
             next_sector,
             map,
+            vertices,
             &origins,
             visited_per_ray,
             all_groups,
@@ -416,7 +423,8 @@ fn render_wall_groups(
     materials: &mut ResMut<Assets<StandardMaterial>>,
     pool: &mut ResMut<WallEntityPool>,
     query: &mut Query<&mut Visibility>,
-    groups: &[WallGroup]
+    groups: &[WallGroup],
+    vertices: &[Vec2]
 ) {
     let needed = groups.len();
     let pool_size = pool.entities.len();
@@ -427,7 +435,7 @@ fn render_wall_groups(
         let group = &groups[i];
 
         if let Some(mut existing) = meshes.get_mut(mesh_handle) {
-            *existing = build_wall_mesh(&group.hits, &group.wall);
+            *existing = build_wall_mesh(&group.hits, &group.wall, vertices);
         }
 
         commands
@@ -455,7 +463,7 @@ fn render_wall_groups(
     if needed > pool_size {
         for i in pool_size..needed {
             let group = &groups[i];
-            let mesh_handle = meshes.add(build_wall_mesh(&group.hits, &group.wall));
+            let mesh_handle = meshes.add(build_wall_mesh(&group.hits, &group.wall, vertices));
             let entity = commands
                 .spawn((
                     Visibility::Visible,
@@ -493,7 +501,8 @@ fn render_portal_boundary_groups(
     materials: &mut ResMut<Assets<StandardMaterial>>,
     pool: &mut ResMut<PortalBoundaryEntityPool>,
     query: &mut Query<&mut Visibility>,
-    groups: &[PortalBoundaryGroup]
+    groups: &[PortalBoundaryGroup],
+    vertices: &[Vec2]
 ) {
     let needed = groups.len();
     let pool_size = pool.entities.len();
@@ -508,7 +517,8 @@ fn render_portal_boundary_groups(
                     &group.hits,
                     &group.wall,
                     group.back_sector.ceiling_height,
-                    group.front_sector.ceiling_height
+                    group.front_sector.ceiling_height,
+                    vertices
                 );
             }
             commands
@@ -534,7 +544,8 @@ fn render_portal_boundary_groups(
                     &group.hits,
                     &group.wall,
                     group.front_sector.floor_height,
-                    group.back_sector.floor_height
+                    group.back_sector.floor_height,
+                    vertices
                 );
             }
             commands
@@ -575,7 +586,8 @@ fn render_portal_boundary_groups(
                         &group.hits,
                         &group.wall,
                         group.back_sector.ceiling_height,
-                        group.front_sector.ceiling_height
+                        group.front_sector.ceiling_height,
+                        vertices
                     )
                 } else {
                     Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
@@ -601,7 +613,8 @@ fn render_portal_boundary_groups(
                         &group.hits,
                         &group.wall,
                         group.front_sector.floor_height,
-                        group.back_sector.floor_height
+                        group.back_sector.floor_height,
+                        vertices
                     )
                 } else {
                     Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
@@ -640,7 +653,8 @@ fn render_viss_groups(
     materials: &mut ResMut<Assets<StandardMaterial>>,
     pool: &mut ResMut<VissEntityPool>,
     query: &mut Query<&mut Visibility>,
-    groups: &[VissGroup]
+    groups: &[VissGroup],
+    vertices: &[Vec2]
 ) {
     let needed = groups.len();
     let pool_size = pool.entities.len();
@@ -650,7 +664,7 @@ fn render_viss_groups(
         let sector = &groups[i].sector;
 
         if let Some(mut existing) = meshes.get_mut(ceil_mesh) {
-            *existing = build_viss_mesh(sector, sector.ceiling_height, false);
+            *existing = build_viss_mesh(sector, sector.ceiling_height, false, vertices);
         }
         commands
             .entity(ceil_entity)
@@ -665,7 +679,7 @@ fn render_viss_groups(
             );
 
         if let Some(mut existing) = meshes.get_mut(floor_mesh) {
-            *existing = build_viss_mesh(sector, sector.floor_height, true);
+            *existing = build_viss_mesh(sector, sector.floor_height, true, vertices);
         }
         commands
             .entity(floor_entity)
@@ -695,7 +709,7 @@ fn render_viss_groups(
             let sector = &groups[i].sector;
 
             let ceil_mesh_handle = meshes.add(
-                build_viss_mesh(sector, sector.ceiling_height, false)
+                build_viss_mesh(sector, sector.ceiling_height, false, vertices)
             );
             let ceil_entity = commands
                 .spawn((
@@ -711,7 +725,7 @@ fn render_viss_groups(
                 ))
                 .id();
 
-            let floor_mesh_handle = meshes.add(build_viss_mesh(sector, sector.floor_height, true));
+            let floor_mesh_handle = meshes.add(build_viss_mesh(sector, sector.floor_height, true, vertices));
             let floor_entity = commands
                 .spawn((
                     Visibility::Visible,
@@ -785,16 +799,18 @@ fn _project_height(world_height: f32, dist: f32, view_info: &ViewInfo) -> f32 {
 // Wall mesh is built from ray hit positions (partial wall slice).
 // bottom/top come from the hit itself so the same function works
 // for walls at any height.
-pub fn build_wall_mesh(hit_group: &[WallHit], wall: &LineDef) -> Mesh {
+pub fn build_wall_mesh(hit_group: &[WallHit], wall: &LineDef, vertices: &[Vec2]) -> Mesh {
     let start = hit_group.first().unwrap();
     let end = hit_group.last().unwrap();
 
     let p0 = start.pos;
     let p1 = end.pos;
 
-    let wall_length = wall.start.distance(wall.end);
-    let u0 = p0.distance(wall.start) / wall_length;
-    let u1 = p1.distance(wall.start) / wall_length;
+    let wall_start = *wall.start(vertices);
+    let wall_end = *wall.end(vertices);
+    let wall_length = wall_start.distance(wall_end);
+    let u0 = p0.distance(wall_start) / wall_length;
+    let u1 = p1.distance(wall_start) / wall_length;
 
     let positions = vec![
         [p0.x, p0.y, start.bottom],
@@ -803,7 +819,7 @@ pub fn build_wall_mesh(hit_group: &[WallHit], wall: &LineDef) -> Mesh {
         [p0.x, p0.y, start.top]
     ];
 
-    let normal = wall_normal(wall).extend(0.0);
+    let normal = wall_normal(wall, vertices).extend(0.0);
     let normals = vec![[normal.x, normal.y, normal.z]; 4];
     let uvs = vec![[u0, 1.0], [u1, 1.0], [u1, 0.0], [u0, 0.0]];
 
@@ -821,7 +837,8 @@ pub fn build_portal_boundary_mesh(
     hit_group: &[WallHit],
     wall: &LineDef,
     floor_height: f32,
-    ceiling_height: f32
+    ceiling_height: f32,
+    vertices: &[Vec2]
 ) -> Mesh {
     let start = hit_group.first().unwrap();
     let end = hit_group.last().unwrap();
@@ -829,9 +846,11 @@ pub fn build_portal_boundary_mesh(
     let p0 = start.pos;
     let p1 = end.pos;
 
-    let wall_length = wall.start.distance(wall.end);
-    let u0 = p0.distance(wall.start) / wall_length;
-    let u1 = p1.distance(wall.start) / wall_length;
+    let wall_start = *wall.start(vertices);
+    let wall_end = *wall.end(vertices);
+    let wall_length = wall_start.distance(wall_end);
+    let u0 = p0.distance(wall_start) / wall_length;
+    let u1 = p1.distance(wall_start) / wall_length;
 
     let positions = vec![
         [p0.x, p0.y, floor_height],
@@ -840,7 +859,7 @@ pub fn build_portal_boundary_mesh(
         [p0.x, p0.y, ceiling_height]
     ];
 
-    let normal = wall_normal(wall).extend(0.0);
+    let normal = wall_normal(wall, vertices).extend(0.0);
     let normals = vec![[normal.x, normal.y, normal.z]; 4];
     let uvs = vec![[u0, 1.0], [u1, 1.0], [u1, 0.0], [u0, 0.0]];
 
@@ -854,9 +873,9 @@ pub fn build_portal_boundary_mesh(
 // Obstacle mesh is built from the full LineDef geometry (not ray hits).
 // Built once at startup and never rebuilt.
 // UVs span 0..1 across the full edge length.
-pub fn build_obstacle_edge_mesh(edge: &LineDef, bottom: f32, top: f32) -> Mesh {
-    let p0 = edge.start;
-    let p1 = edge.end;
+pub fn build_obstacle_edge_mesh(edge: &LineDef, bottom: f32, top: f32, vertices: &[Vec2]) -> Mesh {
+    let p0 = *edge.start(vertices);
+    let p1 = *edge.end(vertices);
 
     let positions = vec![
         [p0.x, p0.y, bottom],
@@ -865,7 +884,7 @@ pub fn build_obstacle_edge_mesh(edge: &LineDef, bottom: f32, top: f32) -> Mesh {
         [p0.x, p0.y, top]
     ];
 
-    let normal = wall_normal(edge).extend(0.0);
+    let normal = wall_normal(edge, vertices).extend(0.0);
     let normals = vec![[normal.x, normal.y, normal.z]; 4];
     let uvs = vec![[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]];
 
@@ -878,44 +897,44 @@ pub fn build_obstacle_edge_mesh(edge: &LineDef, bottom: f32, top: f32) -> Mesh {
 
 // Viss mesh triangulates the sector polygon at a given height.
 // facing_up controls normal direction and triangle winding.
-pub fn build_viss_mesh(sector: &Sector, height: f32, facing_up: bool) -> Mesh {
-    let vertices: Vec<Vec2> = sector.walls
+pub fn build_viss_mesh(sector: &Sector, height: f32, facing_up: bool, vertices: &[Vec2]) -> Mesh {
+    let verts: Vec<Vec2> = sector.walls
         .iter()
-        .map(|wall| wall.start)
+        .map(|wall| *wall.start(vertices))
         .collect();
 
-    let vertex_count = vertices.len();
+    let vertex_count = verts.len();
     if vertex_count < 3 {
         return Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
     }
 
-    let positions: Vec<[f32; 3]> = vertices
+    let positions: Vec<[f32; 3]> = verts
         .iter()
         .map(|v| [v.x, v.y, height])
         .collect();
     let normal = if facing_up { [0.0, 0.0, 1.0] } else { [0.0, 0.0, -1.0] };
     let normals: Vec<[f32; 3]> = vec![normal; vertex_count];
 
-    let min_x = vertices
+    let min_x = verts
         .iter()
         .map(|v| v.x)
         .fold(f32::INFINITY, f32::min);
-    let max_x = vertices
+    let max_x = verts
         .iter()
         .map(|v| v.x)
         .fold(f32::NEG_INFINITY, f32::max);
-    let min_y = vertices
+    let min_y = verts
         .iter()
         .map(|v| v.y)
         .fold(f32::INFINITY, f32::min);
-    let max_y = vertices
+    let max_y = verts
         .iter()
         .map(|v| v.y)
         .fold(f32::NEG_INFINITY, f32::max);
     let range_x = max_x - min_x;
     let range_y = max_y - min_y;
 
-    let uvs: Vec<[f32; 2]> = vertices
+    let uvs: Vec<[f32; 2]> = verts
         .iter()
         .map(|v| {
             let u = if range_x > 0.0 { (v.x - min_x) / range_x } else { 0.0 };
@@ -924,7 +943,7 @@ pub fn build_viss_mesh(sector: &Sector, height: f32, facing_up: bool) -> Mesh {
         })
         .collect();
 
-    let indices = triangulate_polygon(&vertices, facing_up);
+    let indices = triangulate_polygon(&verts, facing_up);
 
     Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
@@ -937,19 +956,19 @@ pub fn build_viss_mesh(sector: &Sector, height: f32, facing_up: bool) -> Mesh {
 /// Uses the obstacle edge start points to form the polygon outline,
 /// then triangulates it exactly like a viss plane.
 /// facing_up: true = top cap (normal +Z), false = bottom cap (normal -Z)
-pub fn build_obstacle_cap_mesh(edges: &[LineDef], height: f32, facing_up: bool) -> Mesh {
+pub fn build_obstacle_cap_mesh(edges: &[LineDef], height: f32, facing_up: bool, vertices: &[Vec2]) -> Mesh {
     // Collect polygon vertices from edge start points
-    let vertices: Vec<Vec2> = edges
+    let verts: Vec<Vec2> = edges
         .iter()
-        .map(|e| e.start)
+        .map(|e| *e.start(vertices))
         .collect();
 
-    let vertex_count = vertices.len();
+    let vertex_count = verts.len();
     if vertex_count < 3 {
         return Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
     }
 
-    let positions: Vec<[f32; 3]> = vertices
+    let positions: Vec<[f32; 3]> = verts
         .iter()
         .map(|v| [v.x, v.y, height])
         .collect();
@@ -958,26 +977,26 @@ pub fn build_obstacle_cap_mesh(edges: &[LineDef], height: f32, facing_up: bool) 
     let normals: Vec<[f32; 3]> = vec![normal; vertex_count];
 
     // Normalize UVs to the bounding box of the obstacle footprint
-    let min_x = vertices
+    let min_x = verts
         .iter()
         .map(|v| v.x)
         .fold(f32::INFINITY, f32::min);
-    let max_x = vertices
+    let max_x = verts
         .iter()
         .map(|v| v.x)
         .fold(f32::NEG_INFINITY, f32::max);
-    let min_y = vertices
+    let min_y = verts
         .iter()
         .map(|v| v.y)
         .fold(f32::INFINITY, f32::min);
-    let max_y = vertices
+    let max_y = verts
         .iter()
         .map(|v| v.y)
         .fold(f32::NEG_INFINITY, f32::max);
     let range_x = max_x - min_x;
     let range_y = max_y - min_y;
 
-    let uvs: Vec<[f32; 2]> = vertices
+    let uvs: Vec<[f32; 2]> = verts
         .iter()
         .map(|v| {
             let u = if range_x > 0.0 { (v.x - min_x) / range_x } else { 0.0 };
@@ -988,7 +1007,7 @@ pub fn build_obstacle_cap_mesh(edges: &[LineDef], height: f32, facing_up: bool) 
 
     // Obstacle edges are CW, so the polygon winding is CW.
     // Pass facing_up so triangulate_polygon emits correct winding for each face.
-    let indices = triangulate_polygon(&vertices, facing_up);
+    let indices = triangulate_polygon(&verts, facing_up);
 
     Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
@@ -999,8 +1018,10 @@ pub fn build_obstacle_cap_mesh(edges: &[LineDef], height: f32, facing_up: bool) 
 
 //------------------GEOMETRY HELPERS------------------------------
 
-fn wall_normal(line_def: &LineDef) -> Vec2 {
-    let dir = (line_def.end - line_def.start).normalize_or_zero();
+fn wall_normal(line_def: &LineDef, vertices: &[Vec2]) -> Vec2 {
+    let start = *line_def.start(vertices);
+    let end = *line_def.end(vertices);
+    let dir = (end - start).normalize_or_zero();
     Vec2::new(dir.y, -dir.x)
 }
 

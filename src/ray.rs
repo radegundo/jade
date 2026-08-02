@@ -57,11 +57,11 @@ pub fn get_ray_offset(ray_index: usize, view_info: &ViewInfo) -> f32 {
 // Core 2D ray-segment intersection test.
 // Returns the world position of intersection if the ray hits the segment,
 // None otherwise.
-fn ray_hit(ray: &Ray, wall: &LineDef) -> Option<Vec2> {
+fn ray_hit(ray: &Ray, start: Vec2, end: Vec2) -> Option<Vec2> {
     let (x1, y1) = (ray.start.x, ray.start.y);
     let (x2, y2) = (ray.sec_point.x, ray.sec_point.y);
-    let (x3, y3) = (wall.start.x, wall.start.y);
-    let (x4, y4) = (wall.end.x, wall.end.y);
+    let (x3, y3) = (start.x, start.y);
+    let (x4, y4) = (end.x, end.y);
 
     let denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
     if denom == 0.0 {
@@ -84,8 +84,14 @@ pub fn make_ray(start: Vec2, end: Vec2) -> Ray {
 
 // Exposes single edge hit test for use in render.rs obstacle edge visibility.
 // Returns true if the ray hits this wall closer than max_dist_sq.
-pub fn test_ray_hit(ray: &Ray, wall: &LineDef, origin: Vec2, max_dist_sq: f32) -> bool {
-    if let Some(hit_pos) = ray_hit(ray, wall) {
+pub fn test_ray_hit(
+    ray: &Ray,
+    wall: &LineDef,
+    origin: Vec2,
+    max_dist_sq: f32,
+    vertices: &[Vec2]
+) -> bool {
+    if let Some(hit_pos) = ray_hit(ray, *wall.start(vertices), *wall.end(vertices)) {
         origin.distance_squared(hit_pos) < max_dist_sq
     } else {
         false
@@ -114,7 +120,9 @@ pub fn get_hit_sector(
     let mut nearest_dist_sq = f32::MAX;
 
     for wall in &sector.walls {
-        if let Some(hit) = ray_hit(&ray, wall) {
+        let start = *wall.start(&map.vertices);
+        let end = *wall.end(&map.vertices);
+        if let Some(hit) = ray_hit(&ray, start, end) {
             let dist_sq = origin.distance_squared(hit);
             if dist_sq < nearest_dist_sq {
                 nearest_dist_sq = dist_sq;
@@ -160,7 +168,9 @@ pub fn get_hit_sector_recursive(
     let mut nearest_dist_sq = f32::MAX;
 
     for wall in &sector.walls {
-        if let Some(hit) = ray_hit(&ray, wall) {
+        let start = *wall.start(&map.vertices);
+        let end = *wall.end(&map.vertices);
+        if let Some(hit) = ray_hit(&ray, start, end) {
             let dist_sq = origin.distance_squared(hit);
             if dist_sq < nearest_dist_sq {
                 nearest_dist_sq = dist_sq;
@@ -205,7 +215,9 @@ pub fn ray_hits_obstacle(
 
     if let Some(obstacle) = sector.obstacles.iter().find(|o| o.id == obstacle_id) {
         for edge in &obstacle.edges {
-            if let Some(hit_pos) = ray_hit(&ray, edge) {
+            let start = *edge.start(&map.vertices);
+            let end = *edge.end(&map.vertices);
+            if let Some(hit_pos) = ray_hit(&ray, start, end) {
                 if origin.distance_squared(hit_pos) < max_dist_sq {
                     return true;
                 }

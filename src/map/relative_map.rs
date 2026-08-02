@@ -21,8 +21,8 @@ pub fn draw_walls(
     let transform = &player_cache.transform;
     for sector in &map.sectors {
         for wall in &sector.walls {
-            let start = get_relative_coords(transform, wall.start);
-            let end = get_relative_coords(transform, wall.end);
+            let start = get_relative_coords(transform, *wall.start(&map.vertices));
+            let end = get_relative_coords(transform, *wall.end(&map.vertices));
             let color = if wall.back_side_def.is_some() {
                 Color::srgb(0.35, 0.35, 0.35)
             } else {
@@ -32,8 +32,8 @@ pub fn draw_walls(
         }
         for obstacle in &sector.obstacles {
             for edge in &obstacle.edges {
-                let start = get_relative_coords(transform, edge.start);
-                let end = get_relative_coords(transform, edge.end);
+                let start = get_relative_coords(transform, *edge.start(&map.vertices));
+                let end = get_relative_coords(transform, *edge.end(&map.vertices));
                 gizmos.line_2d(start, end, Color::srgb(0.7, 0.5, 0.2));
             }
         }

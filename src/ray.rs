@@ -153,14 +153,14 @@ pub fn get_hit_sector(
 // Obstacles are handled separately by ray_hits_obstacle.
 pub fn get_hit_sector_recursive(
     origin: Vec2,
-    angle: f32,
+    dir: Vec2,
     offset: f32,
     view_info: &ViewInfo,
     sector_index: usize,
     map: &Map,
     index: usize
 ) -> Option<WallHit> {
-    let end = origin + Vec2::new(angle.cos(), angle.sin()) * view_info.max_distance;
+    let end = origin + dir * view_info.max_distance;
     let ray = Ray { start: origin, sec_point: end };
     let sector = &map.sectors[sector_index];
 
@@ -202,14 +202,12 @@ pub fn get_hit_sector_recursive(
 // Used to determine whether to show an obstacle's pre-spawned entities.
 pub fn ray_hits_obstacle(
     origin: Vec2,
-    angle: f32,
-    view_info: &ViewInfo,
+    end: Vec2,
     sector_index: usize,
     map: &Map,
     max_dist_sq: f32,
     obstacle_id: usize
 ) -> bool {
-    let end = origin + Vec2::new(angle.cos(), angle.sin()) * view_info.max_distance;
     let ray = Ray { start: origin, sec_point: end };
     let sector = &map.sectors[sector_index];
 

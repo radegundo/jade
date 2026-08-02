@@ -14,11 +14,12 @@ pub struct RenderPlugin;
 impl Plugin for RenderPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, render)
-            .add_systems(PostStartup, spawn_obstacle_entities)
+            .add_systems(PostStartup, (spawn_obstacle_entities, spawn_viss_entities))
             .insert_resource(WallEntityPool::default())
             .insert_resource(PortalBoundaryEntityPool::default())
-            .insert_resource(VissEntityPool::default())
-            .insert_resource(ObstacleEntities::default());
+            .insert_resource(VissEntities::default())
+            .insert_resource(ObstacleEntities::default())
+            .insert_resource(MaterialCache::default());
     }
 }
 
@@ -137,6 +138,76 @@ fn spawn_obstacle_entities(
     }
 }
 
+//------------------VISS STARTUP SPAWNING--------------------
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum VissSurface {
+    Floor,
+    Ceiling,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct VissKey {
+    pub(crate) sector_id: usize,
+    pub(crate) surface: VissSurface,
+}
+
+// Resource that holds the pre-spawned floor/ceiling entity for every sector.
+// Built once at PostStartup, never modified.
+#[derive(Resource, Default)]
+pub(crate) struct VissEntities {
+    pub(crate) by_key: HashMap<VissKey, Entity>,
+}
+
+// Runs once after startup. Floor/ceiling geometry is static, so meshes and
+// materials are built once. The render system only toggles Visibility.
+fn spawn_viss_entities(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    map: Res<Map>,
+    mut viss_entities: ResMut<VissEntities>,
+    mut material_cache: ResMut<MaterialCache>
+) {
+    for sector in &map.sectors {
+        let floor_mesh = build_viss_mesh(sector, sector.floor_height, true, &map.vertices);
+        let floor_mat = material_cache.get_or_create(
+            &mut materials,
+            Some(sector.floor_texture.clone())
+        );
+        let floor_entity = commands
+            .spawn((
+                Visibility::Hidden,
+                Mesh3d(meshes.add(floor_mesh)),
+                MeshMaterial3d(floor_mat),
+                Transform::default(),
+            ))
+            .id();
+        viss_entities.by_key.insert(
+            VissKey { sector_id: sector.id, surface: VissSurface::Floor },
+            floor_entity
+        );
+
+        let ceil_mesh = build_viss_mesh(sector, sector.ceiling_height, false, &map.vertices);
+        let ceil_mat = material_cache.get_or_create(
+            &mut materials,
+            Some(sector.ceiling_texture.clone())
+        );
+        let ceil_entity = commands
+            .spawn((
+                Visibility::Hidden,
+                Mesh3d(meshes.add(ceil_mesh)),
+                MeshMaterial3d(ceil_mat),
+                Transform::default(),
+            ))
+            .id();
+        viss_entities.by_key.insert(
+            VissKey { sector_id: sector.id, surface: VissSurface::Ceiling },
+            ceil_entity
+        );
+    }
+}
+
 //------------------MAIN RENDER FUNCTIONS------------------------
 
 //LEGACY 2D RENDER
@@ -177,14 +248,17 @@ pub fn render(
     view_info: Res<ViewInfo>,
     mut wall_pool: ResMut<WallEntityPool>,
     mut portal_pool: ResMut<PortalBoundaryEntityPool>,
-    mut viss_pool: ResMut<VissEntityPool>,
+    viss_entities: Res<VissEntities>,
     obstacle_entities: Res<ObstacleEntities>,
+    mut material_cache: ResMut<MaterialCache>,
     mut query: Query<&mut Visibility>
 ) {
     let transform = &player_cache.transform;
     let vertices = &map.vertices;
 
     if let Some(player_sector_index) = find_player_sector(transform.translation.truncate(), &map) {
+        let ray_table = build_ray_table(transform, &view_info);
+
         let mut all_groups: Vec<WallGroup> = Vec::new();
         let mut portal_boundary_groups: Vec<PortalBoundaryGroup> = Vec::new();
         let mut visible_obstacles: HashSet<ObstacleEdgeKey> = HashSet::new();
@@ -197,8 +271,8 @@ pub fn render(
         let mut visited_per_ray: HashMap<usize, HashSet<usize>> = HashMap::new();
 
         recurse_sector(
-            transform,
             &view_info,
+            &ray_table,
             player_sector_index,
             &map,
             vertices,
@@ -210,11 +284,6 @@ pub fn render(
             &mut visited_sectors
         );
 
-        let viss_groups: Vec<VissGroup> = visited_sectors
-            .iter()
-            .map(|&sector_id| VissGroup { sector: map.sectors[sector_id].clone() })
-            .collect();
-
         render_wall_groups(
             &mut commands,
             &mut meshes,
@@ -222,7 +291,8 @@ pub fn render(
             &mut wall_pool,
             &mut query,
             &all_groups,
-            vertices
+            vertices,
+            &mut material_cache
         );
         render_portal_boundary_groups(
             &mut commands,
@@ -231,17 +301,20 @@ pub fn render(
             &mut portal_pool,
             &mut query,
             &portal_boundary_groups,
-            vertices
+            vertices,
+            &mut material_cache
         );
-        render_viss_groups(
-            &mut commands,
-            &mut meshes,
-            &mut materials,
-            &mut viss_pool,
-            &mut query,
-            &viss_groups,
-            vertices
-        );
+
+        // Toggle floor/ceiling visibility — no mesh work, just Visible/Hidden
+        for (key, &entity) in viss_entities.by_key.iter() {
+            if let Ok(mut vis) = query.get_mut(entity) {
+                *vis = if visited_sectors.contains(&key.sector_id) {
+                    Visibility::Visible
+                } else {
+                    Visibility::Hidden
+                };
+            }
+        }
 
         // Toggle obstacle visibility — no mesh work, just Visible/Hidden
         for (key, &entity) in obstacle_entities.edges.iter() {
@@ -256,11 +329,39 @@ pub fn render(
     }
 }
 
+//------------------RAY TABLE-----------------------------
+
+struct RayTable {
+    offsets: Vec<f32>,
+    dirs: Vec<Vec2>,
+}
+
+// Precomputes angle/offset/direction for every ray once per frame.
+// Matches get_ray_angle/get_ray_offset arithmetic exactly.
+fn build_ray_table(transform: &Transform, view_info: &ViewInfo) -> RayTable {
+    let player_angle = transform.rotation.to_euler(EulerRot::XYZ).2;
+    let fov_rad = view_info.fov.to_radians();
+    let half_fov = fov_rad / 2.0;
+    let angle_step = fov_rad / ((RAY_COUNT as f32) - 1.0).max(1.0);
+
+    let offsets: Vec<f32> = (0..RAY_COUNT)
+        .map(|i| -half_fov + angle_step * (i as f32))
+        .collect();
+    let dirs: Vec<Vec2> = (0..RAY_COUNT)
+        .map(|i| {
+            let angle = player_angle - half_fov + angle_step * (i as f32);
+            Vec2::new(angle.cos(), angle.sin())
+        })
+        .collect();
+
+    RayTable { offsets, dirs }
+}
+
 //------------------SECTOR RECURSION-----------------------------
 
 fn recurse_sector(
-    player_transform: &Transform,
     view_info: &ViewInfo,
+    ray_table: &RayTable,
     sector_index: usize,
     map: &Map,
     vertices: &[Vec2],
@@ -282,13 +383,14 @@ fn recurse_sector(
         }
         visited.insert(sector_index);
 
-        let angle = get_ray_angle(index, player_transform, view_info);
-        let offset = get_ray_offset(index, view_info);
+        let dir = ray_table.dirs[index];
+        let offset = ray_table.offsets[index];
+        let end = origin + dir * view_info.max_distance;
 
         if
             let Some(hit) = get_hit_sector_recursive(
                 origin,
-                angle,
+                dir,
                 offset,
                 view_info,
                 sector_index,
@@ -304,15 +406,13 @@ fn recurse_sector(
                 if
                     ray_hits_obstacle(
                         origin,
-                        angle,
-                        view_info,
+                        end,
                         sector_index,
                         map,
                         max_dist_sq,
                         obstacle.id
                     )
                 {
-                    let end = origin + Vec2::new(angle.cos(), angle.sin()) * view_info.max_distance;
                     let ray = make_ray(origin, end);
 
                     let mut any_side_visible = false;
@@ -379,8 +479,7 @@ fn recurse_sector(
                 }
 
                 for hit in &group {
-                    let angle = get_ray_angle(hit.ray_index, player_transform, view_info);
-                    let dir = Vec2::new(angle.cos(), angle.sin());
+                    let dir = ray_table.dirs[hit.ray_index];
                     let nudged = hit.pos + dir * 0.05;
                     portal_next.entry(back_sector_id).or_default().push((hit.ray_index, nudged));
                 }
@@ -395,8 +494,8 @@ fn recurse_sector(
 
     for (next_sector, origins) in portal_next {
         recurse_sector(
-            player_transform,
             view_info,
+            ray_table,
             next_sector,
             map,
             vertices,
@@ -424,7 +523,8 @@ fn render_wall_groups(
     pool: &mut ResMut<WallEntityPool>,
     query: &mut Query<&mut Visibility>,
     groups: &[WallGroup],
-    vertices: &[Vec2]
+    vertices: &[Vec2],
+    material_cache: &mut ResMut<MaterialCache>
 ) {
     let needed = groups.len();
     let pool_size = pool.entities.len();
@@ -443,10 +543,10 @@ fn render_wall_groups(
             .insert(Visibility::Visible)
             .insert(
                 MeshMaterial3d(
-                    materials.add(StandardMaterial {
-                        base_color_texture: group.wall.front_side_def.textures.middle.clone(),
-                        ..default()
-                    })
+                    material_cache.get_or_create(
+                        materials,
+                        group.wall.front_side_def.textures.middle.clone()
+                    )
                 )
             );
     }
@@ -469,10 +569,10 @@ fn render_wall_groups(
                     Visibility::Visible,
                     Mesh3d(mesh_handle.clone()),
                     MeshMaterial3d(
-                        materials.add(StandardMaterial {
-                            base_color_texture: group.wall.front_side_def.textures.middle.clone(),
-                            ..default()
-                        })
+                        material_cache.get_or_create(
+                            materials,
+                            group.wall.front_side_def.textures.middle.clone()
+                        )
                     ),
                     Transform::default(),
                 ))
@@ -502,7 +602,8 @@ fn render_portal_boundary_groups(
     pool: &mut ResMut<PortalBoundaryEntityPool>,
     query: &mut Query<&mut Visibility>,
     groups: &[PortalBoundaryGroup],
-    vertices: &[Vec2]
+    vertices: &[Vec2],
+    material_cache: &mut ResMut<MaterialCache>
 ) {
     let needed = groups.len();
     let pool_size = pool.entities.len();
@@ -526,10 +627,10 @@ fn render_portal_boundary_groups(
                 .insert(Visibility::Visible)
                 .insert(
                     MeshMaterial3d(
-                        materials.add(StandardMaterial {
-                            base_color_texture: group.wall.front_side_def.textures.upper.clone(),
-                            ..default()
-                        })
+                        material_cache.get_or_create(
+                            materials,
+                            group.wall.front_side_def.textures.upper.clone()
+                        )
                     )
                 );
         } else {
@@ -553,10 +654,10 @@ fn render_portal_boundary_groups(
                 .insert(Visibility::Visible)
                 .insert(
                     MeshMaterial3d(
-                        materials.add(StandardMaterial {
-                            base_color_texture: group.wall.front_side_def.textures.lower.clone(),
-                            ..default()
-                        })
+                        material_cache.get_or_create(
+                            materials,
+                            group.wall.front_side_def.textures.lower.clone()
+                        )
                     )
                 );
         } else {
@@ -598,10 +699,10 @@ fn render_portal_boundary_groups(
                     if group.has_upper { Visibility::Visible } else { Visibility::Hidden },
                     Mesh3d(upper_mesh_handle.clone()),
                     MeshMaterial3d(
-                        materials.add(StandardMaterial {
-                            base_color_texture: group.wall.front_side_def.textures.upper.clone(),
-                            ..default()
-                        })
+                        material_cache.get_or_create(
+                            materials,
+                            group.wall.front_side_def.textures.upper.clone()
+                        )
                     ),
                     Transform::default(),
                 ))
@@ -625,10 +726,10 @@ fn render_portal_boundary_groups(
                     if group.has_lower { Visibility::Visible } else { Visibility::Hidden },
                     Mesh3d(lower_mesh_handle.clone()),
                     MeshMaterial3d(
-                        materials.add(StandardMaterial {
-                            base_color_texture: group.wall.front_side_def.textures.lower.clone(),
-                            ..default()
-                        })
+                        material_cache.get_or_create(
+                            materials,
+                            group.wall.front_side_def.textures.lower.clone()
+                        )
                     ),
                     Transform::default(),
                 ))
@@ -641,113 +742,32 @@ fn render_portal_boundary_groups(
     pool.used = needed;
 }
 
-//------------------VISS PLANES (FLOORS AND CEILINGS)------------------
-
-struct VissGroup {
-    sector: Sector,
-}
-
-fn render_viss_groups(
-    commands: &mut Commands,
-    meshes: &mut ResMut<Assets<Mesh>>,
-    materials: &mut ResMut<Assets<StandardMaterial>>,
-    pool: &mut ResMut<VissEntityPool>,
-    query: &mut Query<&mut Visibility>,
-    groups: &[VissGroup],
-    vertices: &[Vec2]
-) {
-    let needed = groups.len();
-    let pool_size = pool.entities.len();
-
-    for i in 0..min(needed, pool_size) {
-        let (ceil_entity, ref ceil_mesh, floor_entity, ref floor_mesh) = pool.entities[i];
-        let sector = &groups[i].sector;
-
-        if let Some(mut existing) = meshes.get_mut(ceil_mesh) {
-            *existing = build_viss_mesh(sector, sector.ceiling_height, false, vertices);
-        }
-        commands
-            .entity(ceil_entity)
-            .insert(Visibility::Visible)
-            .insert(
-                MeshMaterial3d(
-                    materials.add(StandardMaterial {
-                        base_color_texture: Some(sector.ceiling_texture.clone()),
-                        ..default()
-                    })
-                )
-            );
-
-        if let Some(mut existing) = meshes.get_mut(floor_mesh) {
-            *existing = build_viss_mesh(sector, sector.floor_height, true, vertices);
-        }
-        commands
-            .entity(floor_entity)
-            .insert(Visibility::Visible)
-            .insert(
-                MeshMaterial3d(
-                    materials.add(StandardMaterial {
-                        base_color_texture: Some(sector.floor_texture.clone()),
-                        ..default()
-                    })
-                )
-            );
-    }
-
-    for i in needed..pool.used.min(pool_size) {
-        let (ceil_entity, _, floor_entity, _) = pool.entities[i];
-        if let Ok(mut vis) = query.get_mut(ceil_entity) {
-            *vis = Visibility::Hidden;
-        }
-        if let Ok(mut vis) = query.get_mut(floor_entity) {
-            *vis = Visibility::Hidden;
-        }
-    }
-
-    if needed > pool_size {
-        for i in pool_size..needed {
-            let sector = &groups[i].sector;
-
-            let ceil_mesh_handle = meshes.add(
-                build_viss_mesh(sector, sector.ceiling_height, false, vertices)
-            );
-            let ceil_entity = commands
-                .spawn((
-                    Visibility::Visible,
-                    Mesh3d(ceil_mesh_handle.clone()),
-                    MeshMaterial3d(
-                        materials.add(StandardMaterial {
-                            base_color_texture: Some(sector.ceiling_texture.clone()),
-                            ..default()
-                        })
-                    ),
-                    Transform::default(),
-                ))
-                .id();
-
-            let floor_mesh_handle = meshes.add(build_viss_mesh(sector, sector.floor_height, true, vertices));
-            let floor_entity = commands
-                .spawn((
-                    Visibility::Visible,
-                    Mesh3d(floor_mesh_handle.clone()),
-                    MeshMaterial3d(
-                        materials.add(StandardMaterial {
-                            base_color_texture: Some(sector.floor_texture.clone()),
-                            ..default()
-                        })
-                    ),
-                    Transform::default(),
-                ))
-                .id();
-
-            pool.entities.push((ceil_entity, ceil_mesh_handle, floor_entity, floor_mesh_handle));
-        }
-    }
-
-    pool.used = needed;
-}
-
 //------------------RESOURCES-------------------------------
+
+// Caches StandardMaterials by texture handle so surfaces don't allocate
+// a fresh material asset every frame. Materials depend only on a texture.
+#[derive(Resource, Default)]
+pub struct MaterialCache {
+    by_texture: HashMap<Option<Handle<Image>>, Handle<StandardMaterial>>,
+}
+
+impl MaterialCache {
+    pub fn get_or_create(
+        &mut self,
+        materials: &mut Assets<StandardMaterial>,
+        texture: Option<Handle<Image>>
+    ) -> Handle<StandardMaterial> {
+        self.by_texture
+            .entry(texture.clone())
+            .or_insert_with(|| {
+                materials.add(StandardMaterial {
+                    base_color_texture: texture,
+                    ..default()
+                })
+            })
+            .clone()
+    }
+}
 
 #[derive(Resource)]
 pub struct WallEntityPool {
@@ -770,19 +790,6 @@ pub struct PortalBoundaryEntityPool {
 }
 
 impl Default for PortalBoundaryEntityPool {
-    fn default() -> Self {
-        Self { entities: Vec::with_capacity(64), used: 0 }
-    }
-}
-
-#[derive(Resource)]
-pub struct VissEntityPool {
-    // (ceil_entity, ceil_mesh, floor_entity, floor_mesh)
-    pub entities: Vec<(Entity, Handle<Mesh>, Entity, Handle<Mesh>)>,
-    pub used: usize,
-}
-
-impl Default for VissEntityPool {
     fn default() -> Self {
         Self { entities: Vec::with_capacity(64), used: 0 }
     }

@@ -36,10 +36,26 @@ pub struct WallHit {
 
 // ----------------------HELPER FUNCTIONS---------------------------
 
+// Safety cap so the raycast never widens beyond a sane angle.
+const MAX_RAYCAST_FOV: f32 = 150.0;
+
+// The 3D camera pitches freely, and a pitched perspective camera shows a wider
+// horizontal angle at the screen's left/right edges. Widen the raycast FOV by
+// the same amount (view_info.pitch is the look-target Z offset for a forward
+// offset of 1, so the pitch angle is atan(pitch)), otherwise the outermost
+// walls fall off the screen. Returns the base fov at zero pitch.
+pub fn effective_fov(view_info: &ViewInfo) -> f32 {
+    let half_tan = (view_info.fov.to_radians() / 2.0).tan();
+    let pitch = view_info.pitch.atan();
+    (2.0 * (half_tan / pitch.cos()).atan())
+        .to_degrees()
+        .clamp(view_info.fov, MAX_RAYCAST_FOV)
+}
+
 // Returns the absolute world-space angle for ray at index.
 pub fn get_ray_angle(ray_index: usize, transform: &Transform, view_info: &ViewInfo) -> f32 {
     let player_angle = transform.rotation.to_euler(EulerRot::XYZ).2;
-    let fov_rad = view_info.fov.to_radians();
+    let fov_rad = effective_fov(view_info).to_radians();
     let half_fov = fov_rad / 2.0;
     let angle_step = fov_rad / ((RAY_COUNT as f32) - 1.0).max(1.0);
     player_angle - half_fov + angle_step * (ray_index as f32)
@@ -48,7 +64,7 @@ pub fn get_ray_angle(ray_index: usize, transform: &Transform, view_info: &ViewIn
 // Returns the offset angle from the view center for ray at index.
 // Used to correct fish-eye distortion via offset.cos().
 pub fn get_ray_offset(ray_index: usize, view_info: &ViewInfo) -> f32 {
-    let fov_rad = view_info.fov.to_radians();
+    let fov_rad = effective_fov(view_info).to_radians();
     let half_fov = fov_rad / 2.0;
     let angle_step = fov_rad / ((RAY_COUNT as f32) - 1.0).max(1.0);
     -half_fov + angle_step * (ray_index as f32)

@@ -2,6 +2,7 @@ use bevy::{ camera::visibility::RenderLayers, prelude::* };
 use crate::{ EYE_OFFSET, PlayerCameraCache, ViewInfo, map::{ relative_map::RelativeMapPlugin } };
 
 pub mod relative_map;
+pub mod save;
 
 //------------------------------MAP PLUGIN-------------------------
 pub struct MapPlugin;
@@ -114,7 +115,11 @@ fn setup_gizmo_layers(mut config_store: ResMut<GizmoConfigStore>) {
 //-----------------------------MAP SETUP--------------------------------
 
 fn setup_map(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.insert_resource(test_map(asset_server));
+    let map = match save::load_map(save::MAP_NAME, &asset_server) {
+        Some(map) => map,
+        None => test_map(asset_server),
+    };
+    commands.insert_resource(map);
 }
 
 //------------HELPER FUNCTIONS FOR SECTOR BUILDING----------------

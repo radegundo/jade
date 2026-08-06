@@ -82,6 +82,12 @@ pub fn make_ray(start: Vec2, end: Vec2) -> Ray {
     Ray { start, sec_point: end }
 }
 
+// A sector is closed (solid) when none of its walls are portals. A closed
+// sector behaves as a solid block sitting inside whichever sector contains it.
+fn is_closed_sector(sector: &Sector) -> bool {
+    sector.walls.iter().all(|w| w.back_side_def.is_none())
+}
+
 // Exposes single edge hit test for use in render.rs obstacle edge visibility.
 // Returns true if the ray hits this wall closer than max_dist_sq.
 pub fn test_ray_hit(
@@ -179,10 +185,36 @@ pub fn get_hit_sector_recursive(
         }
     }
 
+    // A closed sector (no portal walls) is a solid block that sits inside
+    // whichever sector contains it. Cast against its walls too, so the block
+    // occludes and renders instead of being invisible. Taking the nearest hit
+    // across both sets is safe: if the closed sector is behind this sector's
+    // own walls, those walls are closer and win.
+    for (other_index, other) in map.sectors.iter().enumerate() {
+        if other_index == sector_index {
+            continue;
+        }
+        if other.walls.is_empty() || !is_closed_sector(other) {
+            continue;
+        }
+        for wall in &other.walls {
+            let start = *wall.start(&map.vertices);
+            let end = *wall.end(&map.vertices);
+            if let Some(hit) = ray_hit(&ray, start, end) {
+                let dist_sq = origin.distance_squared(hit);
+                if dist_sq < nearest_dist_sq {
+                    nearest_dist_sq = dist_sq;
+                    nearest_hit = Some((hit, wall.id));
+                }
+            }
+        }
+    }
+
     nearest_hit.map(|(pos, wall_id)| {
         let raw_dist = nearest_dist_sq.sqrt();
         let perp_dist = raw_dist * offset.cos();
-        let wall = &sector.walls[wall_id.index];
+        let owner = &map.sectors[wall_id.sector];
+        let wall = &owner.walls[wall_id.index];
         WallHit {
             pos,
             perp_dist,
@@ -191,8 +223,8 @@ pub fn get_hit_sector_recursive(
             is_portal: wall.back_side_def.is_some(),
             back_sector: wall.back_side_def.as_ref().map(|s| s.facing),
             ray_index: index,
-            bottom: sector.floor_height,
-            top: sector.ceiling_height,
+            bottom: owner.floor_height,
+            top: owner.ceiling_height,
         }
     })
 }

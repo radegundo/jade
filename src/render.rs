@@ -457,7 +457,10 @@ fn recurse_sector(
             continue;
         }
 
-        let front_sector = &map.sectors[sector_index];
+        // A hit may belong to a closed (solid) sector other than the one being
+        // traversed, so resolve the wall from the sector that owns it.
+        let wall_owner_index = group[0].wall_id.sector;
+        let front_sector = &map.sectors[wall_owner_index];
         let wall = front_sector.walls[group[0].wall_id.index].clone();
 
         if group[0].is_portal {
